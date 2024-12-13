@@ -1,0 +1,3 @@
+string sensor_name
+string sensor_value
+string value_type
