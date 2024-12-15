@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
         twist_msg.angular.z = movedata.az;
 
         pub.publish(twist_msg);
-        debug();
+        //debug();
         loop_rate.sleep();
     }
 

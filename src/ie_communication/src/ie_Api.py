@@ -4,35 +4,30 @@ import flask
 import socketio
 import rospy
 from std_msgs.msg import String, Bool, Byte, Int32
+from sensor_msgs.msg import Image
 from ie_communication.msg import DirectionEnum, SensorDataMap
 from flask_cors import CORS
 from ie_communication.srv import camState, camStateResponse
-
+from cv_bridge import CvBridge
+import asyncio
+import uvicorn
+import cv2
+import base64
 
 class ie_API_Server:
     def __init__(self):
-        self.app = flask.Flask(__name__)
         
-        # Initialize CORS with wildcard to allow any origin
-        CORS(self.app, resources={r"/*": {"origins": "*"}})
-
-        # Manually add CORS headers after each request
-        @self.app.after_request
-        def apply_cors(response):
-            response.headers["Access-Control-Allow-Origin"] = "*"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-            return response
+        self._bridge = CvBridge()
 
         # Initialize SocketIO with CORS allowed
-        self.sio = socketio.Server(cors_allowed_origins="*")
-        self.app.wsgi_app = socketio.WSGIApp(self.sio, self.app.wsgi_app)
+        self.sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins="*")
+        self.app = socketio.ASGIApp(self.sio)
 
         # Define publishers and subscribers
         self.mc_pub = rospy.Publisher("motor_controller", Int32, queue_size=10)
         #self.cam_pub = rospy.Publisher("camera_state", Bool, queue_size=10)
         
-        self.cam_sub = rospy.Subscriber("camera_feed", Byte, self.cameraFeedCallback)
+        self.cam_sub = rospy.Subscriber("camera_feed", Image, self.run_async_cameraFeedCallback)
         self.sensors_sub = rospy.Subscriber("sensor_data", SensorDataMap, self.sensorsCallback)
 
         # Register event handlers
@@ -42,20 +37,42 @@ class ie_API_Server:
         self.sio.on("moveDirection", self.movement)
         self.sio.on("message", self.message)
 
-    def sensorsCallback(self, data):
+    async def sensorsCallback(self, data):
         pass
-
-    def cameraFeedCallback(self,data):
-        print(data)
+    
+    def run_async_cameraFeedCallback(self,data):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.cameraFeedCallback(data))
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting camera feed: {e}")
         
+    async def cameraFeedCallback(self, data):
+        try:
+            # Convert ROS Image to OpenCV image using CvBridge
+            bridge = CvBridge()
+            cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
 
-    def onConnect(self, sid, environ):
+            # Encode the OpenCV image as JPEG (or PNG)
+            _, buffer = cv2.imencode('.jpg', cv_image)
+            
+            # Convert to base64 string for transmission
+            data_base64 = base64.b64encode(buffer).decode('utf-8')
+
+            # Emit the encoded image through the socket
+            await self.sio.emit("camera_feed", {"image": data_base64})
+
+        except Exception as e:
+            rospy.logerr(f"Error processing and emitting camera feed: {e}")
+
+    async def onConnect(self, sid, environ):
         print(f"client {sid} connected")
     
-    def onDisconnect(self, sid):
+    async def onDisconnect(self, sid):
         print(f"client {sid} disconnected")
 
-    def cameraStateChange(self, sid, state):
+    async def cameraStateChange(self, sid, state):
         print(state)
         rospy.wait_for_service('camera_state')
         camera_state = rospy.ServiceProxy('camera_state', camState)
@@ -69,7 +86,7 @@ class ie_API_Server:
             print("Service did not process request: " + str(exc))
 
 
-    def movement(self, sid, direction):
+    async def movement(self, sid, direction):
         print(direction["direction"])
         if direction["direction"] == "UP" :
             self.mc_pub.publish(1)
@@ -83,10 +100,22 @@ class ie_API_Server:
             self.mc_pub.publish(5)
 
     def connect(self):
-        self.app.run(host="0.0.0.0", port=5000)
+        try:
+            # Start the eventlet WSGI server
+            uvicorn.run(self.app, host='0.0.0.0', port=5000)
+        except KeyboardInterrupt:
+            rospy.loginfo("Server shutting down gracefully...")
+            self._stop()
+        except Exception as e:
+            rospy.logerr(f"Unexpected server error: {e}")
+            self._stop()
 
-    def message(self, sid, message):
+    async def message(self, sid, message):
         print(f"client {sid} : {message}")
+    
+    def _stop(self):
+        rospy.loginfo("Server shutting down...")
+        self.sio.stop()  # Stop Socket.IO
 
 if __name__ == '__main__':
     from threading import Thread
