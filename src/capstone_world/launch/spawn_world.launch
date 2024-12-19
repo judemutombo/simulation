@@ -1,0 +1,4 @@
+<launch>
+  <arg name="world_file" default="$(find capstone_world)/worlds/test_world.world" />
+  <node name="gazebo" pkg="gazebo_ros" type="gazebo" args="-s libgazebo_ros_factory.so $(arg world_file)" output="screen" />
+</launch>

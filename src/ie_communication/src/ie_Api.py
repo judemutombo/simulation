@@ -55,7 +55,7 @@ class ie_API_Server:
             cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
 
             # Encode the OpenCV image as JPEG (or PNG)
-            _, buffer = cv2.imencode('.jpg', cv_image)
+            _, buffer = cv2.imencode('.png', cv_image)
             
             # Convert to base64 string for transmission
             data_base64 = base64.b64encode(buffer).decode('utf-8')

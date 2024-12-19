@@ -23,6 +23,8 @@ class CameraController:
         try:
             # Convert the ROS Image message to an OpenCV-compatible format
             self._camFrame = data
+            cv_image = self._bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
+            #cv2.imshow("camera",cv_image)
             self._cam_available = True
             self._provideCamFeed()
         except Exception as e:

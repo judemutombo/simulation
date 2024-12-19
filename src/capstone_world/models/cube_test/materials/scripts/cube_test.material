@@ -1,0 +1,13 @@
+material teknofest_logo
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture Teknofest_merged3.png
+      }
+    }
+  }
+}
