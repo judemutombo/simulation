@@ -130,7 +130,7 @@
     </scene>
     <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose>10.05 -1.16137 4.98565 -0 0.673158 -2.79079</pose>
+        <pose>-11.7421 -10.8461 11.855 0 0.589157 0.693212</pose>
         <view_controller>orbit</view_controller>
         <projection_type>perspective</projection_type>
       </camera>
@@ -151,10 +151,10 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
     <state world_name='default'>
-      <sim_time>11041 246000000</sim_time>
-      <real_time>345 557558049</real_time>
-      <wall_time>1734557919 515570126</wall_time>
-      <iterations>331075</iterations>
+      <sim_time>11131 323000000</sim_time>
+      <real_time>47 591338029</real_time>
+      <wall_time>1734634307 255950303</wall_time>
+      <iterations>47309</iterations>
       <model name='black_line'>
         <pose>0 0 0.06 0 -0 0</pose>
         <scale>1 1 1</scale>
@@ -469,66 +469,66 @@
         <link name='back_left_leg'>
           <pose>5.1e-05 4.66606 0.059217 -0.000454 -0.000888 -3.9e-05</pose>
           <velocity>-3.3e-05 4.9e-05 -0.183543 0.084237 0.175 0.000128</velocity>
-          <acceleration>-0 -0 0 0 -0 0</acceleration>
+          <acceleration>-0 -0 0 -0 -0 -0</acceleration>
           <wrench>-0 -0 0 0 -0 0</wrench>
         </link>
         <link name='back_right_leg'>
           <pose>5.1e-05 4.66606 0.059218 0.000561 -0.000626 1.7e-05</pose>
           <velocity>-3.1e-05 -2.6e-05 -0.183862 -0.109799 0.125972 -3.9e-05</velocity>
-          <acceleration>-0 0 0 0 -0 0</acceleration>
-          <wrench>-0 0 0 0 -0 0</wrench>
+          <acceleration>-0 -0 0 0 -0 0</acceleration>
+          <wrench>-0 -0 0 0 -0 0</wrench>
         </link>
         <link name='front_left_leg'>
           <pose>5.1e-05 4.66606 0.059214 -0.000598 0.000662 1.3e-05</pose>
           <velocity>4.6e-05 4e-05 -0.183137 0.11165 -0.120622 -2.8e-05</velocity>
-          <acceleration>-0 -0 -0 0 -0 0</acceleration>
-          <wrench>-0 -0 -0 0 -0 0</wrench>
+          <acceleration>-0 -0 0 -0 -0 -0</acceleration>
+          <wrench>-0 -0 0 0 -0 0</wrench>
         </link>
         <link name='front_right_leg'>
           <pose>5.1e-05 4.66606 0.059215 0.000824 0.000593 -3.9e-05</pose>
           <velocity>5.5e-05 -2.6e-05 -0.18327 -0.15948 -0.107294 -3.8e-05</velocity>
-          <acceleration>-0 -0 -0 0 -0 0</acceleration>
-          <wrench>-0 -0 -0 0 -0 0</wrench>
+          <acceleration>-0 -0 0 0 -0 0</acceleration>
+          <wrench>-0 -0 0 0 -0 0</wrench>
         </link>
         <link name='table_surface'>
           <pose>5.1e-05 4.66606 0.05922 7.4e-05 -4.3e-05 -1.2e-05</pose>
           <velocity>1.3e-05 1.1e-05 -0.184197 -0.016352 0.01394 6e-06</velocity>
-          <acceleration>-0 -0 0 -0 -0 -0</acceleration>
-          <wrench>-0 -0 0 0 -0 0</wrench>
+          <acceleration>0 -0 0 0 -0 0</acceleration>
+          <wrench>0 -0 0 0 -0 0</wrench>
         </link>
       </model>
       <model name='platform_0'>
         <pose>-0.000401 -4.6655 0.059206 -7.1e-05 -3e-06 0.001161</pose>
         <scale>1 1 1</scale>
         <link name='back_left_leg'>
-          <pose>-0.000394 -4.6655 0.059202 -0.000677 -0.00076 -0.000243</pose>
-          <velocity>-0.000648 -0.001845 -0.190248 0.131928 0.148046 0.588161</velocity>
-          <acceleration>0 0 0 0 -0 0</acceleration>
+          <pose>-0.000394 -4.6655 0.059202 -0.000677 -0.00076 -0.000241</pose>
+          <velocity>-0.000647 -0.001842 -0.190248 0.131927 0.148046 0.58739</velocity>
+          <acceleration>0 0 0 -0 -0 -0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
         <link name='back_right_leg'>
-          <pose>-0.000395 -4.66551 0.059203 0.000483 -0.000776 0.002707</pose>
-          <velocity>-0.00034 0.000515 -0.190288 -0.090546 0.151446 0.00072</velocity>
-          <acceleration>-0 -0 0 0 -0 0</acceleration>
-          <wrench>-0 -0 0 0 -0 0</wrench>
+          <pose>-0.000395 -4.66551 0.059203 0.000483 -0.000776 0.002705</pose>
+          <velocity>-0.00034 0.000514 -0.190288 -0.090545 0.151447 0.00072</velocity>
+          <acceleration>-0 0 0 0 -0 0</acceleration>
+          <wrench>-0 0 0 0 -0 0</wrench>
         </link>
         <link name='front_left_leg'>
-          <pose>-0.000405 -4.6655 0.059201 -0.000643 0.000647 0.002639</pose>
-          <velocity>0.001681 -0.001813 -0.189877 0.125552 -0.120205 0.003588</velocity>
-          <acceleration>0 -0 0 0 -0 0</acceleration>
-          <wrench>0 -0 0 0 -0 0</wrench>
+          <pose>-0.000405 -4.6655 0.059201 -0.000643 0.000647 0.002637</pose>
+          <velocity>0.001679 -0.00181 -0.189877 0.125552 -0.120205 0.003582</velocity>
+          <acceleration>-0 0 0 -0 -0 -0</acceleration>
+          <wrench>-0 0 0 0 -0 0</wrench>
         </link>
         <link name='front_right_leg'>
-          <pose>-0.000404 -4.66551 0.0592 0.000733 0.000756 -0.000478</pose>
-          <velocity>0.001461 0.000744 -0.18975 -0.136977 -0.14093 0.64084</velocity>
-          <acceleration>-0 -0 -0 0 -0 0</acceleration>
-          <wrench>-0 -0 -0 0 -0 0</wrench>
+          <pose>-0.000404 -4.66551 0.0592 0.000733 0.000756 -0.000476</pose>
+          <velocity>0.001459 0.000744 -0.18975 -0.136976 -0.14093 0.640015</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
         </link>
         <link name='table_surface'>
           <pose>-0.000401 -4.6655 0.059206 -7.1e-05 -3e-06 0.001161</pose>
-          <velocity>0.000763 -0.000708 -0.190877 0.016295 0.00347 0.29695</velocity>
-          <acceleration>0 0 0 0 -0 0</acceleration>
-          <wrench>0 0 0 0 -0 0</wrench>
+          <velocity>0.000762 -0.000707 -0.190877 0.016295 0.00347 0.296552</velocity>
+          <acceleration>-0 0 0 0 -0 0</acceleration>
+          <wrench>-0 0 0 0 -0 0</wrench>
         </link>
       </model>
       <model name='qr_code'>
@@ -753,15 +753,6 @@
       </model>
       <light name='sun'>
         <pose>0 0 10 0 -0 0</pose>
-      </light>
-      <light name='user_point_light_0'>
-        <pose>0 0 4 0 -0 0</pose>
-      </light>
-      <light name='user_point_light_1'>
-        <pose>0 -3.5 4 0 -0 0</pose>
-      </light>
-      <light name='user_point_light_2'>
-        <pose>0 3.5 4 0 -0 0</pose>
       </light>
     </state>
     <model name='black_line_clone'>
@@ -2584,60 +2575,6 @@
       </joint>
       <pose>0.018035 -4.59177 0 0 -0 0</pose>
     </model>
-    <light name='user_point_light_0' type='point'>
-      <pose>-0.089094 -0.040019 1 0 -0 0</pose>
-      <diffuse>0.5 0.5 0.5 1</diffuse>
-      <specular>0.1 0.1 0.1 1</specular>
-      <attenuation>
-        <range>20</range>
-        <constant>0.5</constant>
-        <linear>0.01</linear>
-        <quadratic>0.001</quadratic>
-      </attenuation>
-      <cast_shadows>0</cast_shadows>
-      <direction>0 0 -1</direction>
-      <spot>
-        <inner_angle>0</inner_angle>
-        <outer_angle>0</outer_angle>
-        <falloff>0</falloff>
-      </spot>
-    </light>
-    <light name='user_point_light_1' type='point'>
-      <pose>-0.011297 -3.43767 1 0 -0 0</pose>
-      <diffuse>0.5 0.5 0.5 1</diffuse>
-      <specular>0.1 0.1 0.1 1</specular>
-      <attenuation>
-        <range>20</range>
-        <constant>0.5</constant>
-        <linear>0.01</linear>
-        <quadratic>0.001</quadratic>
-      </attenuation>
-      <cast_shadows>0</cast_shadows>
-      <direction>0 0 -1</direction>
-      <spot>
-        <inner_angle>0</inner_angle>
-        <outer_angle>0</outer_angle>
-        <falloff>0</falloff>
-      </spot>
-    </light>
-    <light name='user_point_light_2' type='point'>
-      <pose>0.155011 3.54169 1 0 -0 0</pose>
-      <diffuse>0.5 0.5 0.5 1</diffuse>
-      <specular>0.1 0.1 0.1 1</specular>
-      <attenuation>
-        <range>20</range>
-        <constant>0.5</constant>
-        <linear>0.01</linear>
-        <quadratic>0.001</quadratic>
-      </attenuation>
-      <cast_shadows>0</cast_shadows>
-      <direction>0 0 -1</direction>
-      <spot>
-        <inner_angle>0</inner_angle>
-        <outer_angle>0</outer_angle>
-        <falloff>0</falloff>
-      </spot>
-    </light>
     <model name='qr_code'>
       <pose>6.94378 -0.710513 0 0 -0 0</pose>
       <link name='link_0'>
