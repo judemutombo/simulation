@@ -3,7 +3,7 @@
 import flask
 import socketio
 import rospy
-from std_msgs.msg import String, Bool, Byte, Int32
+from std_msgs.msg import String, Bool, Byte, Int32, Float32
 from sensor_msgs.msg import Image
 from ie_communication.msg import DirectionEnum, SensorDataMap
 from flask_cors import CORS
@@ -24,11 +24,12 @@ class ie_API_Server:
         self.app = socketio.ASGIApp(self.sio)
 
         # Define publishers and subscribers
-        self.mc_pub = rospy.Publisher("motor_controller", Int32, queue_size=10)
+        self.mc_pub = rospy.Publisher("manual_controller", Int32, queue_size=10)
         #self.cam_pub = rospy.Publisher("camera_state", Bool, queue_size=10)
         
         self.cam_sub = rospy.Subscriber("camera_feed", Image, self.run_async_cameraFeedCallback)
         self.sensors_sub = rospy.Subscriber("sensor_data", SensorDataMap, self.sensorsCallback)
+        self.speed_sub = rospy.Subscriber("speed_value", Float32, self.run_async_speedCallback)
 
         # Register event handlers
         self.sio.on("connect", self.onConnect)
@@ -37,7 +38,7 @@ class ie_API_Server:
         self.sio.on("moveDirection", self.movement)
         self.sio.on("message", self.message)
 
-    async def sensorsCallback(self, data):
+    def sensorsCallback(self, data):
         pass
     
     def run_async_cameraFeedCallback(self,data):
@@ -66,6 +67,21 @@ class ie_API_Server:
         except Exception as e:
             rospy.logerr(f"Error processing and emitting camera feed: {e}")
 
+    def run_async_speedCallback(self,data):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.speedCallback(data))
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting camera feed: {e}")
+        
+
+    async def speedCallback(self, data):
+        try:
+            await self.sio.emit("speed", {"speed": data.data})
+        except Exception as e:
+            rospy.logerr(f"Error emitting speed: {e}")
+
     async def onConnect(self, sid, environ):
         print(f"client {sid} connected")
     
@@ -93,9 +109,9 @@ class ie_API_Server:
         elif direction["direction"] == "DOWN" :
             self.mc_pub.publish(2)
         elif direction["direction"] == "LEFT" :
-            self.mc_pub.publish(3)
-        elif direction["direction"] == "RIGHT":
             self.mc_pub.publish(4)
+        elif direction["direction"] == "RIGHT":
+            self.mc_pub.publish(3)
         elif direction["direction"] == "STOP":
             self.mc_pub.publish(5)
 
