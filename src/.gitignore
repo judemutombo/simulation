@@ -1,5 +1,4 @@
 .vscode
-turtlebot3_simulations
 robot_description
 build
 CMakeLists.txt
