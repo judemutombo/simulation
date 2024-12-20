@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import flask
 import socketio
 import rospy
 from std_msgs.msg import String, Bool, Byte, Int32, Float32

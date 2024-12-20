@@ -2,4 +2,6 @@
 robot_description
 build
 CMakeLists.txt
+ie_communication/package.xml
+capstone_world/package.xml
 turtlebot3_simulations
