@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import socketio
+import socketio.asgi
+import socketio.async_server
 import rospy
 from std_msgs.msg import String, Bool, Byte, Int32, Float32
 from sensor_msgs.msg import Image
@@ -17,10 +19,9 @@ class ie_API_Server:
     def __init__(self):
         
         self._bridge = CvBridge()
-
         # Initialize SocketIO with CORS allowed
-        self.sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins="*")
-        self.app = socketio.ASGIApp(self.sio)
+        self.sio = socketio.async_server.AsyncServer(async_mode='asgi', cors_allowed_origins="*")
+        self.app = socketio.asgi.ASGIApp(self.sio)
 
         # Define publishers and subscribers
         self.mc_pub = rospy.Publisher("manual_controller", Int32, queue_size=10)
