@@ -30,6 +30,7 @@ class ie_API_Server:
         self.cam_sub = rospy.Subscriber("camera_feed", Image, self.run_async_cameraFeedCallback)
         self.sensors_sub = rospy.Subscriber("sensor_data", SensorDataMap, self.sensorsCallback)
         self.speed_sub = rospy.Subscriber("speed_value", Float32, self.run_async_speedCallback)
+        self.map_sub = rospy.Subscriber("map_feed", Image, self.run_async_mapFeedCallback)
 
         # Register event handlers
         self.sio.on("connect", self.onConnect)
@@ -81,6 +82,32 @@ class ie_API_Server:
             await self.sio.emit("speed", {"speed": data.data})
         except Exception as e:
             rospy.logerr(f"Error emitting speed: {e}")
+
+    def run_async_mapFeedCallback(self,data):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.mapFeedCallback(data))
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting map feed: {e}")
+
+    async def mapFeedCallback(self, data):
+        try:
+            # Convert ROS Image to OpenCV image using CvBridge
+            bridge = CvBridge()
+            cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
+
+            # Encode the OpenCV image as JPEG (or PNG)
+            _, buffer = cv2.imencode('.png', cv_image)
+            
+            # Convert to base64 string for transmission
+            data_base64 = base64.b64encode(buffer).decode('utf-8')
+
+            # Emit the encoded image through the socket
+            await self.sio.emit("map_feed", {"image": data_base64})
+
+        except Exception as e:
+            rospy.logerr(f"Error processing and emitting map feed: {e}")
 
     async def onConnect(self, sid, environ):
         print(f"client {sid} connected")
