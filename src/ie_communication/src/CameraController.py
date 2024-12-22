@@ -68,6 +68,6 @@ class CameraController:
 if __name__ == '__main__':
     from threading import Thread
 
-    rospy.init_node('CameraController', disable_signals=True)
+    rospy.init_node('CameraController')
     cam = CameraController()
     rospy.spin()

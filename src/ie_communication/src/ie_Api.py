@@ -25,12 +25,13 @@ class ie_API_Server:
 
         # Define publishers and subscribers
         self.mc_pub = rospy.Publisher("manual_controller", Int32, queue_size=10)
-        #self.cam_pub = rospy.Publisher("camera_state", Bool, queue_size=10)
         
         self.cam_sub = rospy.Subscriber("camera_feed", Image, self.run_async_cameraFeedCallback)
+        self.cam_qr_sub = rospy.Subscriber("camera_qr_code_feed", Image, self.run_async_cameraQrFeedCallback)
         self.sensors_sub = rospy.Subscriber("sensor_data", SensorDataMap, self.sensorsCallback)
         self.speed_sub = rospy.Subscriber("speed_value", Float32, self.run_async_speedCallback)
         self.map_sub = rospy.Subscriber("map_feed", Image, self.run_async_mapFeedCallback)
+        self.gear_sub = rospy.Subscriber("robot_gear", Int32, self.run_async_gearCallback)
 
         # Register event handlers
         self.sio.on("connect", self.onConnect)
@@ -38,7 +39,7 @@ class ie_API_Server:
         self.sio.on("cameraState", self.cameraStateChange)
         self.sio.on("moveDirection", self.movement)
         self.sio.on("message", self.message)
-        self.sio.on("Task", self.taskCallback)
+        self.sio.on("robot_task", self.taskCallback)
 
     def sensorsCallback(self, data):
         pass
@@ -69,6 +70,33 @@ class ie_API_Server:
         except Exception as e:
             rospy.logerr(f"Error processing and emitting camera feed: {e}")
 
+    def run_async_cameraQrFeedCallback(self,data):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.cameraQrFeedCallback(data))
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting camera feed: {e}")
+        
+    async def cameraQrFeedCallback(self, data):
+        try:
+            # Convert ROS Image to OpenCV image using CvBridge
+            bridge = CvBridge()
+            cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
+
+            # Encode the OpenCV image as JPEG (or PNG)
+            _, buffer = cv2.imencode('.png', cv_image)
+            
+            # Convert to base64 string for transmission
+            data_base64 = base64.b64encode(buffer).decode('utf-8')
+
+            # Emit the encoded image through the socket
+            await self.sio.emit("camera_qr_feed", {"image": data_base64})
+
+        except Exception as e:
+            rospy.logerr(f"Error processing and emitting camera feed: {e}")
+
+
     def run_async_speedCallback(self,data):
         try:
             loop = asyncio.new_event_loop()
@@ -77,7 +105,6 @@ class ie_API_Server:
         except Exception as e:
             rospy.logerr(f"Error before proccessing and emitting camera feed: {e}")
         
-
     async def speedCallback(self, data):
         try:
             await self.sio.emit("speed", {"speed": data.data})
@@ -110,16 +137,33 @@ class ie_API_Server:
         except Exception as e:
             rospy.logerr(f"Error processing and emitting map feed: {e}")
 
+    def run_async_gearCallback(self,data):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.gearCallback(data))
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting gear: {e}")   
+    
+    async def gearCallback(self, data):
+        try:
+            await self.sio.emit("gear", {"gear": data.data})
+        except Exception as e:
+            rospy.logerr(f"Error emitting gear: {e}")
+
     async def taskCallback(self, sid, task):
+        print(task)
         t = TaskData()
-        t.task_name = task["task_name"]
+        t.task_name = task['task']["task_name"]
+        t.params = task['task']["params"]
         
         rospy.wait_for_service('robot_task')
         robot_task = rospy.ServiceProxy('robot_task', robotTask)
-
+        robot_task.wait_for_service(10)
         try:
             response = robot_task(t)
-            await self.sio.emit("task_response", {"response": response.response})
+            print(response)
+            await self.sio.emit("task_response", {"response": response.message}, to=sid)
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))   
 

@@ -17,4 +17,11 @@ class Task:
     @params.setter
     def params(self, params):
         self._params = params
+
+    def start(self):
+        self._running = True
+        self._execute()
+    
+    def _execute(self):
+        pass
     

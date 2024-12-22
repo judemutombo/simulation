@@ -25,8 +25,8 @@ struct cmd_vel {
     float wait_duration = 0.3; // Time to wait before starting interpolation (in seconds)
 
     float radius = 0.16;
-    void changeGear(int new_gear) {
-        gear = new_gear;
+    void changeGear(const std_msgs::Int32::ConstPtr& msg) {
+        gear = msg->data;
     }
     void increaseLinear() {
         lx += 0.01;
@@ -145,6 +145,8 @@ int main(int argc, char** argv) {
     ros::Subscriber sub = n.subscribe("manual_controller", 1000, callback);
 
     ros::Publisher speedPub = n.advertise<std_msgs::Float32>("speed_value", 10);
+
+    ros::Subscriber sub2 = n.subscribe("robot_gear", 1000, movedata.changeGear);
 
     ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 10);
 
