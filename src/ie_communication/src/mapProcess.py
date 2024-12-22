@@ -37,7 +37,6 @@ class mapProcess :
             rospy.logwarn("Could not get transform: %s", str(e))
 
     def map_callback(self, data):
-        rospy.loginfo("Received map")
         if self.robot_position is None or self.robot_rotation is None:
             return  # Wait for the robot's position to be available
 

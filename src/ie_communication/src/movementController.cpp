@@ -4,7 +4,10 @@
 #include "std_msgs/Float32.h"
 #include <geometry_msgs/Twist.h>
 #include <cmath>
+
 struct cmd_vel {
+    int gear = 0;
+
     float lx = 0.0;
     float ly = 0.0;
     float lz = 0.0;
@@ -22,7 +25,9 @@ struct cmd_vel {
     float wait_duration = 0.3; // Time to wait before starting interpolation (in seconds)
 
     float radius = 0.16;
-
+    void changeGear(int new_gear) {
+        gear = new_gear;
+    }
     void increaseLinear() {
         lx += 0.01;
     }
@@ -105,6 +110,10 @@ void debug() {
 
 // Callback function for subscriber
 void callback(const std_msgs::Int32::ConstPtr& msg) {
+    if(movedata.gear == 1){
+        ROS_WARN_STREAM("The robot is in autonomous mode, manual control is disabled");
+        return;
+    }
     switch (msg->data) {
         case 1:
             movedata.increaseLinear();

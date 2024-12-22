@@ -6,9 +6,9 @@ import socketio.async_server
 import rospy
 from std_msgs.msg import String, Bool, Byte, Int32, Float32
 from sensor_msgs.msg import Image
-from ie_communication.msg import DirectionEnum, SensorDataMap
+from ie_communication.msg import DirectionEnum, SensorDataMap, TaskData
 from flask_cors import CORS
-from ie_communication.srv import camState, camStateResponse
+from ie_communication.srv import camState, camStateResponse, robotTask, robotTaskResponse
 from cv_bridge import CvBridge
 import asyncio
 import uvicorn
@@ -38,6 +38,7 @@ class ie_API_Server:
         self.sio.on("cameraState", self.cameraStateChange)
         self.sio.on("moveDirection", self.movement)
         self.sio.on("message", self.message)
+        self.sio.on("Task", self.taskCallback)
 
     def sensorsCallback(self, data):
         pass
@@ -108,6 +109,19 @@ class ie_API_Server:
 
         except Exception as e:
             rospy.logerr(f"Error processing and emitting map feed: {e}")
+
+    async def taskCallback(self, sid, task):
+        t = TaskData()
+        t.task_name = task["task_name"]
+        
+        rospy.wait_for_service('robot_task')
+        robot_task = rospy.ServiceProxy('robot_task', robotTask)
+
+        try:
+            response = robot_task(t)
+            await self.sio.emit("task_response", {"response": response.response})
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))   
 
     async def onConnect(self, sid, environ):
         print(f"client {sid} connected")
