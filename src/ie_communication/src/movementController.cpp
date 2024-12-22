@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
 
     ros::Publisher speedPub = n.advertise<std_msgs::Float32>("speed_value", 10);
 
-    ros::Subscriber sub2 = n.subscribe("robot_gear", 1000, movedata.changeGear);
+    ros::Subscriber sub2 = n.subscribe("robot_gear", 1000, &cmd_vel::changeGear, &movedata);
 
     ros::Publisher pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 10);
 
