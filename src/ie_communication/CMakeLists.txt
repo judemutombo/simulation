@@ -66,6 +66,7 @@ add_service_files(
   FILES
   camState.srv
   robotTask.srv
+  robotGear.srv
 )
 
 ## Generate actions in the 'action' folder

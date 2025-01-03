@@ -8,7 +8,8 @@ from std_msgs.msg import String, Bool, Byte, Int32, Float32
 from sensor_msgs.msg import Image
 from ie_communication.msg import DirectionEnum, SensorDataMap, TaskData
 from flask_cors import CORS
-from ie_communication.srv import camState, camStateResponse, robotTask, robotTaskResponse
+from ie_communication.srv import camState, camStateResponse, robotTask, robotTaskResponse, robotGear, robotGearResponse
+
 from cv_bridge import CvBridge
 import asyncio
 import uvicorn
@@ -31,7 +32,6 @@ class ie_API_Server:
         self.sensors_sub = rospy.Subscriber("sensor_data", SensorDataMap, self.sensorsCallback)
         self.speed_sub = rospy.Subscriber("speed_value", Float32, self.run_async_speedCallback)
         self.map_sub = rospy.Subscriber("map_feed", Image, self.run_async_mapFeedCallback)
-        self.gear_sub = rospy.Subscriber("robot_gear", Int32, self.run_async_gearCallback)
 
         # Register event handlers
         self.sio.on("connect", self.onConnect)
@@ -40,6 +40,7 @@ class ie_API_Server:
         self.sio.on("moveDirection", self.movement)
         self.sio.on("message", self.message)
         self.sio.on("robot_task", self.taskCallback)
+        self.sio.on("robot_gear", self.gearCallback)
 
     def sensorsCallback(self, data):
         pass
@@ -137,19 +138,19 @@ class ie_API_Server:
         except Exception as e:
             rospy.logerr(f"Error processing and emitting map feed: {e}")
 
-    def run_async_gearCallback(self,data):
+    async def gearCallback(self, data, sid):
+        rospy.wait_for_service('change_gear')
+        robot_gear = rospy.ServiceProxy('change_gear', robotGear)
+        robot_gear.wait_for_service(10)
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.gearCallback(data))
-        except Exception as e:
-            rospy.logerr(f"Error before proccessing and emitting gear: {e}")   
-    
-    async def gearCallback(self, data):
-        try:
-            await self.sio.emit("gear", {"gear": data.data})
-        except Exception as e:
-            rospy.logerr(f"Error emitting gear: {e}")
+            response = robot_gear(0)
+            if response.message:
+                await self.sio.emit("gear_response", {"response": "changed"}, to=sid)
+            else:
+                await self.sio.emit("gear_response", {"response": "Failed"}, to=sid)
+            
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))
 
     async def taskCallback(self, sid, task):
         print(task)
