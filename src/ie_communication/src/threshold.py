@@ -8,6 +8,7 @@ from std_msgs.msg import Float32
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 from qreader import QReader
+
 #from ie_communication.srv import robotGear, robotGearResponse
 class Threshold:
     def __init__(self):
@@ -15,21 +16,23 @@ class Threshold:
         self.rate = rospy.Rate(10)
         self.msg = Twist()
         self.bridge = CvBridge()
-        self.param = {"KP": 0.0046, "SP": 0.05}
+        self.param = {"KP": 500, "SP": 0.05, "TSP" : 0.05, }
 
-        self.decisionMade = False
+        self.needMakeDecision = False
         self.hasDetectedQrRecently = False
         self._lastQrCode = None
 
-        self._subcamqr = rospy.Subscriber("/camera_qr_code_feed",Image, self._camqrProcess)
-        self.sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
         self.pub = rospy.Publisher("/error", Float32, queue_size=1)
         self.pub2 = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
+        self.stop()
+        self._subcamqr = rospy.Subscriber("/camera_qr_code_feed",Image, self._camqrProcess)
+        self.sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
         self.img_size = None
         self._black_pixels = 492250
-        self._threshold = 0.006
+        self._threshold = 0.026
         self._middle_width = 580
         self._autonomous = False
+        self.timer = None
         # rospy.wait_for_service('change_gear')
         # robot_gear = rospy.ServiceProxy('change_gear', robotGear)
         # robot_gear.wait_for_service(10)
@@ -59,39 +62,70 @@ class Threshold:
         self.msg.angular.z = 0.0
         self.pub2.publish(self.msg)
 
+    def _turn_left(self):
+        """Turn the robot to the left."""
+        print("Turning left")
+        self.msg.linear.x = 0.08
+        self.msg.angular.z = 0.5
+        self.pub2.publish(self.msg)
+
+    def _turn_right(self):
+        """Turn the robot to the right."""
+        print("Turning right")
+        self.msg.linear.x = 0.05
+        self.msg.angular.z = -0.5
+        self.pub2.publish(self.msg)
+
+    def _move(self, error):
+        """Move the robot based on the error."""
+        self.msg.linear.x = self.param["SP"]
+        self.msg.angular.z = -error/self.param["KP"]  
+        self.pub2.publish(self.msg)
+    
+    def stop(self):
+        """Stop the robot."""
+        self.msg.linear.x = 0.0
+        self.msg.angular.z = 0.0
+        self.pub2.publish(self.msg)
 
     def _adjust_orientation(self, error, pixels, mask , w_min, h_min):
+
         """Adjust the robot's orientation based on the error."""
         # if not self._autonomous:
         #     return None
         
-
         if (w_min < 100 and h_min < 100) :
-            #self._move_forward()
+            self._move_forward()
             return None
         
-        
+        ## if the pixels are within the threshold, move forward and adjust the orientation based on the error
         if (pixels <= self._black_pixels + (self._black_pixels * self._threshold)) and  (pixels >= self._black_pixels - (self._black_pixels * self._threshold)):
-            self.msg.linear.x = self.param["SP"]
-            self.msg.angular.z = -self.param["KP"] * error
-            self.pub2.publish(self.msg)
+            self._move(error)
             return None
         
+        ## if the pixels are greater than the threshold, check the side pixels
         if pixels > (self._black_pixels + (self._black_pixels * self._threshold)):
             
             left_pixels, right_pixels, onLeft, onRight = self.check_side_pixels(mask)
 
+            ## if the pixels are on the left or right side, check the top pixels
             if onLeft or onRight:
-                top_pixels_remaining, top_pixels_side, bottom_pixels_side, onTop = self.check_straight_pixels(mask)
+                top_pixels_remaining, top_pixels_side, bottom_pixels_side, onTop, hastoStop = self.check_straight_pixels(mask)
+                if hastoStop :
+                    self.needMakeDecision = True
+                    self.junction_decision(onLeft, onRight, onTop)
                 return [left_pixels, right_pixels,top_pixels_remaining, top_pixels_side, bottom_pixels_side]
-             
-            #self._move_forward()
+            
+            ## if the pixels are not on the left or right side, move forward
+            self._move_forward()
             return [left_pixels, right_pixels,0,0,0]
-
-
-        self.msg.linear.x = self.param["SP"]
-        self.msg.angular.z = -self.param["KP"] * error
-        self.pub2.publish(self.msg)
+        
+        ## if the pixels are less than the threshold, move forward
+        elif pixels < (self._black_pixels - (self._black_pixels * self._threshold)):
+            self._move(error)
+            return None
+        
+        self._move(error)
         return None 
 
     def check_side_pixels(self, mask):
@@ -110,7 +144,7 @@ class Threshold:
         right_half = masked_binary[:, width // 2:]
         left_pixels = np.sum(left_half == 255)
         right_pixels = np.sum(right_half == 255)
-        print(f"Left pixels: {left_pixels}, Right pixels: {right_pixels}")
+        #print(f"Left pixels: {left_pixels}, Right pixels: {right_pixels}")
 
         threshold_lr = (self._black_pixels // 3) - 20
         if left_pixels > threshold_lr :
@@ -122,6 +156,7 @@ class Threshold:
 
     def check_straight_pixels(self, mask):
         onTop = False
+        hastoStop = False
 
         height, width = mask.shape
         middle_start = (width // 2) - (self._middle_width // 2)
@@ -136,9 +171,10 @@ class Threshold:
 
         top_pixels = np.sum(top_half == 255)
         bottom_pixels = np.sum(bottom_half == 255)
-        print(f"Top pixels: {top_pixels}, Bottom pixels: {bottom_pixels}")
+        #print(f"Top pixels: {top_pixels}, Bottom pixels: {bottom_pixels}")
 
         if bottom_pixels >= top_pixels:
+            hastoStop = True
             middle_line = mask[:, middle_start:middle_end]
             height, _ = middle_line.shape
             top_half = middle_line[:height // 2, :]
@@ -148,18 +184,31 @@ class Threshold:
             top_pixels_remaining = np.sum(top_half == 255)
             continuity_threshold = 0.5 * np.sum(middle_line == 255)
 
-            top_mask = np.zeros_like(mask)
-            top_mask[height // 2:, :] = 255
-            masked_binary2 = cv2.bitwise_and(mask, cv2.bitwise_not(top_mask))
-            cv2.imshow("masked",masked_binary2)
             if top_pixels_remaining >= continuity_threshold:
                 onTop = True
-                return top_pixels_remaining, top_pixels, bottom_pixels, onTop
+                return top_pixels_remaining, top_pixels, bottom_pixels, onTop, hastoStop
             else:
-                return top_pixels_remaining, top_pixels, bottom_pixels, onTop
+                return top_pixels_remaining, top_pixels, bottom_pixels, onTop, hastoStop
         else:
-            return 0, top_pixels, bottom_pixels, onTop
+            return 0, top_pixels, bottom_pixels, onTop, hastoStop
 
+    def junction_decision(self, onLeft, onRight, onTop):
+        print("Making decision")
+        self.stop()
+        if onLeft:
+            self._turn_left()
+        elif onRight:
+            self._turn_right()
+        self.timer = rospy.Timer(rospy.Duration(3), self.resume_processing, oneshot=True)
+
+
+    def resume_processing(self, event):
+        rospy.loginfo("Resuming image processing")
+        self.stop()
+        self.needMakeDecision = False
+        self.hasDetectedQrRecently = False
+        if self.timer:
+            self.timer.shutdown()  # Clean up the timer
 
     def callback(self, data):
         try:
@@ -234,32 +283,34 @@ class Threshold:
                     cv2.line(image, (0, image.shape[0] // 2), (image.shape[1], image.shape[0] // 2), (0, 0, 255), 2)
 
                 
-
-                px = self._adjust_orientation(error, black_pixels, mask, w_min, h_min)
-                if px is not None:
-                    cv2.putText(image,str(f"Left px:{px[0]}"),(10, 480), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                    cv2.putText(image,str(f"Right px:{px[1]}"),(10, 560), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                    cv2.putText(image,str(f"Top px:{px[2]}"),(10, 640), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                    cv2.putText(image,str(f"Top px side:{px[3]}"),(10, 720), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                    cv2.putText(image,str(f"Bot px side:{px[4]}"),(10, 800), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                if not self.needMakeDecision :
+                    px = self._adjust_orientation(error, black_pixels, mask, w_min, h_min)
+                    if px is not None:
+                        cv2.putText(image,str(f"Left px:{px[0]}"),(10, 480), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        cv2.putText(image,str(f"Right px:{px[1]}"),(10, 560), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        cv2.putText(image,str(f"Top px:{px[2]}"),(10, 640), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        cv2.putText(image,str(f"Top px side:{px[3]}"),(10, 720), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                        cv2.putText(image,str(f"Bot px side:{px[4]}"),(10, 800), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             else:
                 self._move_forward()
 
            
             
             cv2.imshow('Main', image)
-            
+            key = cv2.waitKey(1) & 0xFF	
+            if key == ord("q"):
+                self.stop()
         except CvBridgeError as e:
             print(e)
-        if cv2.waitKey(1) == 27:
-            rospy.signal_shutdown("shutdown")
-            cv2.destroyAllWindows()
+        
 
 
 
-
+def nothin():
+    pass
 if __name__ == '__main__':
 
     rospy.init_node('Threshold')
     th = Threshold()
     rospy.spin()
+    

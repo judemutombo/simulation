@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
         twist_msg.angular.z = movedata.az;
         if(movedata.gear == 1){
             
-            pub.publish(twist_msg);
+            //pub.publish(twist_msg);
 
         }
         std_msgs::Float32 vel;
