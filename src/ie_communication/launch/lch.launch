@@ -2,6 +2,6 @@
     <node pkg='ie_communication' type="movementController" name="movementController" output="screen"/>
     <node pkg='ie_communication' type="CameraController.py" name="CameraController" output="log"/>
     <!-- <node pkg='ie_communication' type="mapProcess.py" name="mapProcess" output="log"/> -->
-    <!-- <node pkg='ie_communication' type="ProcessController.py" name="ProcessController" output="screen"/> -->
+    <node pkg='ie_communication' type="ProcessController.py" name="ProcessController" output="screen"/>
     <node pkg='ie_communication' type="ie_Api.py" name="ie_Api" output="log"/>
 </launch>

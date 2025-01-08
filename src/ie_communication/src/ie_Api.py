@@ -97,7 +97,6 @@ class ie_API_Server:
         except Exception as e:
             rospy.logerr(f"Error processing and emitting camera feed: {e}")
 
-
     def run_async_speedCallback(self,data):
         try:
             loop = asyncio.new_event_loop()
@@ -186,7 +185,6 @@ class ie_API_Server:
                 camera_state(False)
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
-
 
     async def movement(self, sid, direction):
         print(direction["direction"])
