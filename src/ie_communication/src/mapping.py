@@ -9,26 +9,28 @@ class Mapping(Task):
         super().__init__("mapping")
         self.fsignal = signalslot.Signal(args=['qrcodes'])
 
-
-
     def _check_qr(self, decoded_text):
         if decoded_text[0] == "None" or decoded_text[0] is None:
             return
         if decoded_text[0] != self._lastQrCode:
-            if (decoded_text[0] in self.qrcodes):
-                super()._task_finished()
+            if len(self.qrcodes) > 1:
+                self._task_finished()
                 return
+            """ if (decoded_text[0] in self.qrcodes):
+                self._task_finished()
+                return """
             
             self._lastQrCode = decoded_text[0]
             self.hasDetectedQrRecently = True
             position = self._calculate_distance(self.robot_pose)
             self.qrcodes[decoded_text[0]] = position
-            print(f"QR Code: {decoded_text[0]}")
-            print(f"Position: {position}")
+            #print(f"QR Code: {decoded_text[0]}")
+            #print(f"Position: {position}")
 
     def _task_finished(self):
-        super()._task_finished()
+        self._running = False
         self.fsignal.emit(qrcodes=self.qrcodes)
+        super()._task_finished()
 
 
 if __name__ == '__main__':

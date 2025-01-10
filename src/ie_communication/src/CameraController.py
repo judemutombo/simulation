@@ -4,7 +4,6 @@ import rospy
 from ie_communication.srv import camState, camStateResponse
 import cv2
 from cv_bridge import CvBridge
-
 from sensor_msgs.msg import Image
 
 class CameraController:

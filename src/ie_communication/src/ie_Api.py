@@ -4,12 +4,10 @@ import socketio
 import socketio.asgi
 import socketio.async_server
 import rospy
-from std_msgs.msg import String, Bool, Byte, Int32, Float32
+from std_msgs.msg import  Int32, Float32, String
 from sensor_msgs.msg import Image
-from ie_communication.msg import DirectionEnum, SensorDataMap, TaskData
-from flask_cors import CORS
-from ie_communication.srv import camState, camStateResponse, robotTask, robotTaskResponse, robotGear, robotGearResponse
-
+from ie_communication.msg import  SensorDataMap, TaskData
+from ie_communication.srv import camState, robotTask, robotGear, taskMessage, taskMessageResponse, mappingOutput, mappingOutputResponse
 from cv_bridge import CvBridge
 import asyncio
 import uvicorn
@@ -17,6 +15,7 @@ import cv2
 import base64
 
 class ie_API_Server:
+
     def __init__(self):
         
         self._bridge = CvBridge()
@@ -26,12 +25,17 @@ class ie_API_Server:
 
         # Define publishers and subscribers
         self.mc_pub = rospy.Publisher("manual_controller", Int32, queue_size=10)
-        
         self.cam_sub = rospy.Subscriber("camera_feed", Image, self.run_async_cameraFeedCallback)
         self.cam_qr_sub = rospy.Subscriber("camera_qr_code_feed", Image, self.run_async_cameraQrFeedCallback)
         self.sensors_sub = rospy.Subscriber("sensor_data", SensorDataMap, self.sensorsCallback)
         self.speed_sub = rospy.Subscriber("speed_value", Float32, self.run_async_speedCallback)
         self.map_sub = rospy.Subscriber("map_feed", Image, self.run_async_mapFeedCallback)
+        self.process_sub = rospy.Subscriber("ProcessState", String, self.run_async_processState)
+
+
+        # Define services
+        rospy.Service('output', taskMessage, self.run_async_taskFinished)
+        rospy.Service('mapping_output', mappingOutput, self.run_async_mappingOutput)
 
         # Register event handlers
         self.sio.on("connect", self.onConnect)
@@ -166,6 +170,50 @@ class ie_API_Server:
             await self.sio.emit("task_response", {"response": response.message}, to=sid)
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))   
+
+    def run_async_taskFinished(self,output):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.taskFinished(output))
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting taskFinished: {e}")
+
+        return taskMessageResponse(True)
+    
+    async def taskFinished(self, output):
+        await self.sio.emit("task_response", {"response": output.message})
+
+    def run_async_mappingOutput(self,output):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.mappingOutput(output))
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting taskFinished: {e}")
+
+        return mappingOutputResponse(True)
+    
+    async def mappingOutput(self, output):
+        print(output)
+        data = [{"location" :kv.location, "x": kv.x, "y":kv.y} for kv in output.locations]
+        print(data)
+        await self.sio.emit("mapping_output", {"locations": data})
+
+    def run_async_processState(self,state):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.processState(state))
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting processState: {e}")
+    
+    async def processState(self, state):
+        try:
+            await self.sio.emit("processState", {"state": state.data})
+
+        except Exception as e:
+            rospy.logerr(f"Error processing and emitting map feed: {e}")
 
     async def onConnect(self, sid, environ):
         print(f"client {sid} connected")

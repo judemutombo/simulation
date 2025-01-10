@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  diagnostic_msgs
   message_generation
   rosconsole
   dynamic_reconfigure
@@ -59,6 +60,7 @@ add_message_files(
   DirectionEnum.msg
   SensorDataMap.msg
   TaskData.msg
+  QrCode.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -67,6 +69,8 @@ add_service_files(
   camState.srv
   robotTask.srv
   robotGear.srv
+  taskMessage.srv
+  mappingOutput.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -80,6 +84,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  diagnostic_msgs
 )
 
 ################################################
@@ -116,7 +121,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES ie_communication
- CATKIN_DEPENDS roscpp rospy std_msgs  message_runtime
+ CATKIN_DEPENDS roscpp rospy std_msgs diagnostic_msgs message_runtime 
 #  DEPENDS system_lib
 )
 

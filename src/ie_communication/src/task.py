@@ -9,11 +9,8 @@ from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 from qreader import QReader
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Pose
-import tf2_ros
 import math
 import signalslot
-#from ie_communication.srv import robotGear, robotGearResponse
 
 class Task:
 
@@ -41,20 +38,9 @@ class Task:
         self._black_pixels = 492250
         self._threshold = 0.026
         self._middle_width = 580
-        self._autonomous = False
         self.timer = None
         self.qrcodes = {}
         self.distanceToQr = 0.4334 
-        # rospy.wait_for_service('change_gear')
-        # robot_gear = rospy.ServiceProxy('change_gear', robotGear)
-        # robot_gear.wait_for_service(10)
-        # try:
-        #     response = robot_gear(0)
-        #     if response.message:
-        #         print("Gear changed to autonomous")
-        #     self._autonomous =  response.message
-        # except rospy.ServiceException as exc:
-        #     print("Service did not process request: " + str(exc))
         self.finishedSignal = signalslot.Signal(args=['message'])
         
     def running(self):
@@ -115,19 +101,19 @@ class Task:
 
     def _move_forward(self):
         """Move forward at a constant speed."""
-        self.msg.linear.x = self.param["SP"]
+        self.msg.linear.x = self.param["TLSP"]
         self.msg.angular.z = 0.0
         self.pub2.publish(self.msg)
 
     def _turn_left(self):
         """Turn the robot to the left."""
-        self.msg.linear.x = 0.08
+        self.msg.linear.x = self.param["TRSP"]
         self.msg.angular.z = 0.5
         self.pub2.publish(self.msg)
 
     def _turn_right(self):
         """Turn the robot to the right."""
-        self.msg.linear.x = 0.05
+        self.msg.linear.x = self.param["SP"]
         self.msg.angular.z = -0.5
         self.pub2.publish(self.msg)
 
@@ -365,8 +351,7 @@ class Task:
     def _task_finished(self):
         self.stop()
         self._running = False
-        cv2.destroyAllWindows()
-        self.finishedSignal.emit(message="Task is finished")   
+        self.finishedSignal.emit(message=f"{self.task} process is finished")   
 
 
 
