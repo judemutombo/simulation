@@ -36,7 +36,7 @@ class Task:
         self.sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
         self.img_size = None
         self._black_pixels = 492250
-        self._threshold = 0.026
+        self._threshold = 0.078
         self._middle_width = 580
         self.timer = None
         self.qrcodes = {}
@@ -129,13 +129,13 @@ class Task:
         self.msg.angular.z = 0.0
         self.pub2.publish(self.msg)
 
-    def _adjust_orientation(self, error, pixels, mask , w_min, h_min):
+    def _adjust_orientation(self, error, angle, pixels, mask , w_min, h_min):
 
         """Adjust the robot's orientation based on the error."""
         # if not self._autonomous:
         #     return None
         
-        if (w_min < 100 and h_min < 100) :
+        if (w_min < 100 and h_min < 100):
             self._move_forward()
             return None
         
@@ -155,6 +155,9 @@ class Task:
                 if hastoStop :
                     self.needMakeDecision = True
                     self.junction_decision(onLeft, onRight, onTop)
+                
+                if top_pixels_remaining == 0 :
+                    self._move_forward()
                 return [left_pixels, right_pixels,top_pixels_remaining, top_pixels_side, bottom_pixels_side]
             
             ## if the pixels are not on the left or right side, move forward
@@ -236,16 +239,20 @@ class Task:
     def junction_decision(self, onLeft, onRight, onTop):
         print("Making decision")
         self.stop()
-        
+        tm = 3
         if self.task == "mapping":
             if onTop:
+                print("On top")
+                tm = 1
                 self._move_forward()
             elif onLeft:
+                print("On left")
                 self._turn_left()
             elif onRight:
+                print("On right")
                 self._turn_right()
 
-        self.timer = rospy.Timer(rospy.Duration(3), self.resume_processing, oneshot=True)
+        self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
 
     def resume_processing(self, event):
         #rospy.loginfo("Resuming image processing")
@@ -268,40 +275,41 @@ class Task:
             x_last = image.shape[1] / 2
             y_last = image.shape[0] / 2
             self.img_size = image.shape
-            Blackline = cv2.inRange(image, (0,0,0), (60,60,60))	
+
+            x_center = image.shape[1] // 2  # Width center of the image
+            y_center = image.shape[0] // 2  # Height center of the image
+
+            # Calculate ROI boundaries
+            x_start = max(0, x_center - (self._middle_width)  // 2)
+            x_end = min(image.shape[1], x_center + (self._middle_width)  // 2)
+
+            # Set all pixels outside the ROI to a color that won't be detected as black (e.g., white)
+            # Create a mask for the pixels outside the ROI
+            image_outside_roi = image.copy()
+
+            # Set pixels outside the ROI to white
+            image_outside_roi[:, :x_start] = [255, 255, 255]  # Left side
+            image_outside_roi[:, x_end:] = [255, 255, 255]    # Right side
+
+            #cv2.imshow("roi",image_outside_roi)
+
+            Blackline = cv2.inRange(image_outside_roi, (0,0,0), (60,60,60))	
             kernel = np.ones((3,3), np.uint8)
             Blackline = cv2.erode(Blackline, kernel, iterations=5)
             Blackline = cv2.dilate(Blackline, kernel, iterations=9)	
-            contours_blk, hierarchy_blk = cv2.findContours(Blackline.copy(),cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
+            contours_blk, hierarchy_blk = cv2.findContours(Blackline.copy(),cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
             contours_blk_len = len(contours_blk)
             if contours_blk_len > 0 :
                 if contours_blk_len == 1 :
                     blackbox = cv2.minAreaRect(contours_blk[0])
                 else:
-                    canditates=[]
-                    off_bottom = 0	   
-                    for con_num in range(contours_blk_len):		
-                        blackbox = cv2.minAreaRect(contours_blk[con_num])
-                        (x_min, y_min), (w_min, h_min), ang = blackbox		
-                        box = cv2.boxPoints(blackbox)
-                        (x_box,y_box) = box[0]
-                        if y_box > 358 :		 
-                            off_bottom += 1
-                        canditates.append((y_box,con_num,x_min,y_min))		
-                    canditates = sorted(canditates)
-                    if off_bottom > 1:	    
-                        canditates_off_bottom=[]
-                        for con_num in range ((contours_blk_len - off_bottom), contours_blk_len):
-                            (y_highest,con_highest,x_min, y_min) = canditates[con_num]		
-                            total_distance = (abs(x_min - x_last)**2 + abs(y_min - y_last)**2)**0.5
-                            canditates_off_bottom.append((total_distance,con_highest))
-                            canditates_off_bottom = sorted(canditates_off_bottom)         
-                            (total_distance,con_highest) = canditates_off_bottom[0]         
-                            blackbox = cv2.minAreaRect(contours_blk[con_highest])	   
-                    else:		
-                        (y_highest,con_highest,x_min, y_min) = canditates[contours_blk_len-1]		
-                        blackbox = cv2.minAreaRect(contours_blk[con_highest])	 
+                    # Sort contours by area, in descending order, and pick the largest
+                    contours_blk = sorted(contours_blk, key=cv2.contourArea, reverse=True)
+                    largest_contour = contours_blk[0]
+                    
+                    # Get the bounding box of the largest contour
+                    blackbox = cv2.minAreaRect(largest_contour)	 
                 (x_min, y_min), (w_min, h_min), ang = blackbox
                 x_last = x_min
                 y_last = y_min
@@ -331,7 +339,7 @@ class Task:
 
                 
                 if not self.needMakeDecision :
-                    px = self._adjust_orientation(error, black_pixels, mask, w_min, h_min)
+                    px = self._adjust_orientation(error, ang, black_pixels, mask, w_min, h_min)
                     if px is not None:
                         cv2.putText(image,str(f"Left px:{px[0]}"),(10, 480), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                         cv2.putText(image,str(f"Right px:{px[1]}"),(10, 560), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
@@ -343,12 +351,15 @@ class Task:
 
            
             
-            #cv2.imshow('Main', image)
-            
+            cv2.imshow('Main', image)
+            key = cv2.waitKey(1) & 0xFF	
+            if key == ord("q"):
+                self.stop()
         except CvBridgeError as e:
             print(e)
 
     def _task_finished(self):
+        cv2.destroyAllWindows()
         self.stop()
         self._running = False
         self.finishedSignal.emit(message=f"{self.task} process is finished")   

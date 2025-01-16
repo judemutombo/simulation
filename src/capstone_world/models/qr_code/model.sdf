@@ -1,0 +1,29 @@
+<?xml version='1.0'?>
+<sdf version='1.7'>
+  <model name='qr_code'>
+    <link name='link_0'>
+      <pose>0 0 0 0 0 0</pose>
+      <visual name='visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.05 0.05 0.001</size>  <!-- Increase size of the box -->
+          </box>
+        </geometry>
+        <material>
+          <lighting>1</lighting>
+          <script>
+            <uri>model://qr_code/materials/scripts</uri>
+            <uri>model://qr_code/materials/textures</uri>
+            <name>qr_code_content</name>
+          </script>
+          <shader type='pixel'/>
+        </material>
+        <transparency>0</transparency> <!-- Adjust transparency to check if it renders -->
+        <cast_shadows>1</cast_shadows>
+      </visual>
+    </link>
+    <static>1</static>
+    <allow_auto_disable>1</allow_auto_disable>
+  </model>
+</sdf>

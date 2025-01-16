@@ -1,0 +1,13 @@
+material load_texture
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture load2.jpg
+      }
+    }
+  }
+}

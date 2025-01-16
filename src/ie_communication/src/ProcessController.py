@@ -53,8 +53,6 @@ class ProcessController :
             return robotTaskResponse("Task can not be set")
 
     def _task_finished(self, message, **kwargs):
-        self._currentTask.stop()
-        self._currentTask = None
         rospy.loginfo(f"Message from task : {message}")
 
         rospy.wait_for_service('output')
@@ -72,6 +70,9 @@ class ProcessController :
         rospy.logerr(message)
 
     def _mapping_finished(self, qrcodes, **kwargs):
+        self._currentTask.stop()
+        del self._currentTask
+        self._currentTask = None
         rospy.loginfo("Mapping process finished")
 
         rospy.wait_for_service('mapping_output')
