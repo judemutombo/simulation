@@ -61,6 +61,7 @@ add_message_files(
   SensorDataMap.msg
   TaskData.msg
   QrCode.msg
+  Param.msg
 )
 
 ## Generate services in the 'srv' folder

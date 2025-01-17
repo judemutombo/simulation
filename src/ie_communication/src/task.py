@@ -42,6 +42,7 @@ class Task:
         self.qrcodes = {}
         self.distanceToQr = 0.4334 
         self.finishedSignal = signalslot.Signal(args=['message'])
+        self.failedSignal = signalslot.Signal(args=['message'])
         
     def running(self):
         return self._running
@@ -107,13 +108,15 @@ class Task:
 
     def _turn_left(self):
         """Turn the robot to the left."""
+        print("Left")
         self.msg.linear.x = self.param["TRSP"]
         self.msg.angular.z = 0.5
         self.pub2.publish(self.msg)
 
     def _turn_right(self):
         """Turn the robot to the right."""
-        self.msg.linear.x = self.param["SP"]
+        print("Right")
+        self.msg.linear.x = self.param["TRSP"]
         self.msg.angular.z = -0.5
         self.pub2.publish(self.msg)
 
@@ -255,10 +258,11 @@ class Task:
         self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
 
     def resume_processing(self, event):
-        #rospy.loginfo("Resuming image processing")
+        rospy.loginfo("Resuming image processing")
         self.stop()
         self.needMakeDecision = False
         self.hasDetectedQrRecently = False
+        self._lastQrCode = None
         if self.timer:
             self.timer.shutdown()  # Clean up the timer
 
@@ -363,6 +367,12 @@ class Task:
         self.stop()
         self._running = False
         self.finishedSignal.emit(message=f"{self.task} process is finished")   
+
+    def _task_failed(self, message):
+        cv2.destroyAllWindows()
+        self.stop()
+        self._running = False
+        self.failedSignal.emit(message=f"{self.task} process failed : {message}")  
 
 
 

@@ -6,7 +6,7 @@ import socketio.async_server
 import rospy
 from std_msgs.msg import  Int32, Float32, String
 from sensor_msgs.msg import Image
-from ie_communication.msg import  SensorDataMap, TaskData
+from ie_communication.msg import  SensorDataMap, TaskData, Param
 from ie_communication.srv import camState, robotTask, robotGear, taskMessage, taskMessageResponse, mappingOutput, mappingOutputResponse
 from cv_bridge import CvBridge
 import asyncio
@@ -159,8 +159,7 @@ class ie_API_Server:
         print(task)
         t = TaskData()
         t.task_name = task['task']["task_name"]
-        t.params = task['task']["params"]
-        
+        t.params =  [Param(zone=key,type=value) for key, value in task['task']["params"].items()]
         rospy.wait_for_service('robot_task')
         robot_task = rospy.ServiceProxy('robot_task', robotTask)
         robot_task.wait_for_service(10)

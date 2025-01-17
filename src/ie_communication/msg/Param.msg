@@ -1,0 +1,2 @@
+string zone
+string type

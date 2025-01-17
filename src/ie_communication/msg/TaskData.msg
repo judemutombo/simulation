@@ -1,2 +1,2 @@
 string task_name
-string[] params
+Param[] params
