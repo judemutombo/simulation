@@ -1,0 +1,12 @@
+<launch>
+  <!-- Load the robot URDF model -->
+  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot5)/urdf/turtlebot5.urdf.xarco" />
+
+  <!-- Spawn the robot in Gazebo -->
+  <node 
+    name="spawn_robot" 
+    type="gazebo" 
+    pkg="gazebo_ros" 
+    args="-s `find gazebo_ros/config`/empty_worlds/empty.world --robot-name turtlebot5 --model turtlebot5" 
+    output="screen"/>
+</launch>
