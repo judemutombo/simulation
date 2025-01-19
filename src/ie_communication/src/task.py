@@ -43,6 +43,7 @@ class Task:
         self.distanceToQr = 0.4334 
         self.finishedSignal = signalslot.Signal(args=['message'])
         self.failedSignal = signalslot.Signal(args=['message'])
+        self._processQrCode =  False
         
     def running(self):
         return self._running
@@ -362,17 +363,23 @@ class Task:
         except CvBridgeError as e:
             print(e)
 
-    def _task_finished(self):
+    def _finish_task(self, success=True, message=None):
+        # Common cleanup actions
         cv2.destroyAllWindows()
         self.stop()
         self._running = False
-        self.finishedSignal.emit(message=f"{self.task} process is finished")   
+
+        # Emit the appropriate signal based on success or failure
+        if success:
+            self.finishedSignal.emit(message=f"{self.task} process is finished")
+        else:
+            self.failedSignal.emit(message=f"{self.task} process failed: {message}")
+
+    def _task_finished(self):
+        self._finish_task(success=True)
 
     def _task_failed(self, message):
-        cv2.destroyAllWindows()
-        self.stop()
-        self._running = False
-        self.failedSignal.emit(message=f"{self.task} process failed : {message}")  
+        self._finish_task(success=False, message=message) 
 
 
 

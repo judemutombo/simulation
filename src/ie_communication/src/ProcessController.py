@@ -8,7 +8,7 @@ from carrying import Carrying
 from ie_communication.srv import  robotTask, robotTaskResponse, taskMessage, mappingOutput
 from ie_communication.msg import QrCode
 from ie_communication.srv import robotGear, robotGearResponse
-import asyncio
+
 
 class ProcessController :
 
@@ -17,15 +17,15 @@ class ProcessController :
         self._service = rospy.Service('robot_task', robotTask, self.setTask)
         self._pubProcessState = rospy.Publisher('/ProcessState', String, queue_size=10)
         self._bridge = CvBridge()
-        self._camqrFrame = None
         self._currentTask = None
+        self._proccessing = False
 
     def processing(self):
         pass
     
     def setTask(self, req):
         rospy.loginfo(f"Received task request: {req.task.task_name}")
-        if self._currentTask is not None:
+        if self._proccessing == True:
             if self._currentTask.running:
                 return robotTaskResponse("a process is already running")
 
@@ -43,6 +43,7 @@ class ProcessController :
                     self._currentTask.failedSignal.connect(self._task_failed)
                     self._currentTask.start()
                     self._publishProcessState()
+                    self._proccessing = True
                     return robotTaskResponse("Mapping process started")
                 
                 elif req.task.task_name == "carrying":
@@ -52,6 +53,7 @@ class ProcessController :
                     self._currentTask.failedSignal.connect(self._task_failed)
                     self._currentTask.start()
                     self._publishProcessState()
+                    self._proccessing = True
                     return robotTaskResponse("Carrying process started")
 
                 return robotTaskResponse("Task can not be set")
@@ -63,6 +65,7 @@ class ProcessController :
             return robotTaskResponse("Task can not be set")
 
     def _task_finished(self, message, **kwargs):
+        self._proccessing = False
         rospy.loginfo(f"Message from task : {message}")
 
         rospy.wait_for_service('output')
@@ -76,12 +79,13 @@ class ProcessController :
         self._publishProcessState()
 
     def _task_failed(self, message, **kwargs):
+        self._currentTask.stop()
         self._currentTask = None
         rospy.logerr(message)
 
     def _mapping_finished(self, qrcodes, **kwargs):
+        self._proccessing = False
         self._currentTask.stop()
-        del self._currentTask
         self._currentTask = None
         rospy.loginfo("Mapping process finished")
 
@@ -100,8 +104,6 @@ class ProcessController :
 
 
 if __name__ == '__main__':
-    from threading import Thread
-
     rospy.init_node('ProcessController')
     pr = ProcessController()
     rospy.spin()

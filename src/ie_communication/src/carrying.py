@@ -17,7 +17,7 @@ class Carrying(Task):
         if self._loadQrCodes():
             super().start()
         else:
-            super()._task_failed("No Qr code found, you may need to do a mapping first.")
+            super()._finish_task(success=False,message="No Qr code found, you may need to do a mapping first.")
 
     def _check_qr(self, decoded_text):
         if decoded_text[0] == "None" or decoded_text[0] is None:
@@ -38,11 +38,11 @@ class Carrying(Task):
            self._currentTask += 1
            print("A goal has been reached") 
            if(self._currentTask == len(self._params)):
-               self._task_finished()
+               self._finish_task(success=True, message="All goals have been reached")
 
-    def _task_finished(self):
+    def _finish_task(self, success=True, message=None):
         self._running = False
-        super()._task_finished()
+        super()._finish_task(success, message)
     
     def _loadQrCodes(self):
         try:
@@ -74,46 +74,55 @@ class Carrying(Task):
                     tm = 1
                     self._move_forward()
                 else : # if the robot can't go straight, failed the task
-                    self._task_failed("The robot is stuck")
+                    self._task_failed("The robot is stuck : should go straight")
 
             elif self._lastQrCode : # qrCode has been scanned
                 if (self._lastQrCode in self.qrcodes):  # check if the scanned qrCode is in the database
-                    intersections = self._getIntersection(current['zone']) # get the intersections of the goal zone
-                    if(self._lastQrCode in [intersections[0][0], intersections[1][0]]): # the last scanned qrCode is one of the goal zone intersection
-                        if onLeft: # possibility of going left, so the robot goes left
-                            self._turn_left()
-                        elif onRight: # possibility of going right so the robot goes right
-                            self._turn_right()
-                        else: # on intersection the robot should turn, if can't, failed the task 
-                            self._task_failed("The robot is stuck")
-                    else: # the last scanned qrCode is not one of the goal zone intersection
-                        # check if the robot is not in front of a corner
-                        if onLeft and (not onTop) and (not onRight) : # in front of a corner going left
-                            self._turn_left() 
-                        elif onRight and (not onTop) and (not onLeft) : # in front of a corner going right
-                            self._turn_right()
-                        else: # not a corner, use shortest path
-                            side = self._chooseSide(onTop, onRight, onLeft, intersections)
-                            if side == "S":
-                                tm = 1
-                                self._move_forward()
-                            elif side == "R":
-                                tm = 3
+                    if self._isStationSide(self._lastQrCode): # check if the scanned qrCode is a station side
+                        tm = 1
+                        self._move_forward()
+                    else:
+                        intersections = self._getIntersection(current['zone']) # get the intersections of the goal zone
+                        if(self._lastQrCode in [intersections[0][0], intersections[1][0]]): # the last scanned qrCode is one of the goal zone intersection
+                            if onLeft: # possibility of going left, so the robot goes left
+                                self._turn_left()
+                            elif onRight: # possibility of going right so the robot goes right
                                 self._turn_right()
-                            elif side == "L":
-                                tm = 3
+                            else: # on intersection the robot should turn, if can't, failed the task 
+                                self._task_failed("The robot is stuck : should turn") 
+                        else: # the last scanned qrCode is not one of the goal zone intersection
+                            # check if the robot is not in front of a corner
+                            if onLeft and (not onTop) and (not onRight) : # in front of a corner going left
                                 self._turn_left() 
-                            elif side == "0":
-                                return
+                            elif onRight and (not onTop) and (not onLeft) : # in front of a corner going right
+                                self._turn_right()
+                            else: # not a corner, use shortest path
+                                side = self._chooseSide(onTop, onRight, onLeft, intersections)
+                                if side == "S":
+                                    tm = 1
+                                    self._move_forward()
+                                elif side == "R":
+                                    tm = 3
+                                    self._turn_right()
+                                elif side == "L":
+                                    tm = 3
+                                    self._turn_left() 
+                                elif side == "0":
+                                    return
 
             self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
+
+    def _isStationSide(self, qrCode) -> bool:
+        zArr = qrCode.split("_")
+        return zArr[len(zArr)-1] == "left" or zArr[len(zArr)-1] == "right"
 
     def _getIntersection(self, zone : str):
         zArr = zone.split(" ")
         inter1 = f"intersection_{zArr[0]}_{zArr[1]}_station_1"
         inter2 = f"intersection_{zArr[0]}_{zArr[1]}_station_2"
-        p1 = (inter1, (self.qrcodes[inter1][0],self.qrcodes[inter1][1]))
-        p2 = (inter2, (self.qrcodes[inter2][0],self.qrcodes[inter2][1]))
+        p1 = (inter1, self.qrcodes.get(inter1, (None, None)))
+        p2 = (inter2, self.qrcodes.get(inter2, (None, None)))
+
 
         return [p1, p2]
 
@@ -123,10 +132,15 @@ class Carrying(Task):
         min_distance = float('inf')
         pose = self.robot_pose
         robot_position = (pose.position.x, pose.position.y)
-        intersection1 = intersections[0][1]
-        intersection2 = intersections[0][1]
-        yaw = yaw = math.atan2(2.0 * (pose.orientation.w * pose.orientation.z + pose.orientation.x * pose.orientation.y),
-                         1.0 - 2.0 * (pose.orientation.y**2 + pose.orientation.z**2))
+        
+        # Extract the intersections and handle the case where they might be (None, None)
+        yaw = math.atan2(2.0 * (pose.orientation.w * pose.orientation.z + pose.orientation.x * pose.orientation.y),
+                        1.0 - 2.0 * (pose.orientation.y**2 + pose.orientation.z**2))
+
+        # Check if both intersections are invalid (None, None)
+        if all(intersection[1] == (None, None) for intersection in intersections):
+            self._task_failed("Both intersections are invalid (None, None)")
+            return "O"
         
         for direction, offset in directions.items():
             # Calculate the new yaw after applying the direction offset
@@ -135,16 +149,23 @@ class Carrying(Task):
             # Project the new position based on the new yaw
             projected_position = self.project_position(robot_position, new_yaw)
             
-            # Calculate distances to the intersections
-            distance1 = self.calculate_distance(projected_position, intersection1)
-            distance2 = self.calculate_distance(projected_position, intersection2)
+            # Initialize a list to store the distances
+            distances = []
             
-            # Choose the smallest distance
-            min_proj_distance = min(distance1, distance2)
-            if min_proj_distance < min_distance:
-                min_distance = min_proj_distance
-                best_direction = direction
+            for intersection in intersections:
+                # Only calculate distance for valid intersections (not (None, None))
+                if intersection[1] != (None, None):
+                    distance = self.calculate_distance(projected_position, intersection[1])
+                    distances.append(distance)
 
+            # If there are valid distances, calculate the minimum distance
+            if distances:
+                min_proj_distance = min(distances)
+                if min_proj_distance < min_distance:
+                    min_distance = min_proj_distance
+                    best_direction = direction
+
+        # Return the best direction based on the conditions
         if best_direction == "S" and onTop:
             return best_direction
         elif best_direction == "R" and onRight:
@@ -154,6 +175,7 @@ class Carrying(Task):
         else:
             self._task_failed("Cannot go in the direction found by the shortest path")
             return "O"
+
     
     def project_position(self, position, yaw):
         x, y = position

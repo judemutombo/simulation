@@ -12,7 +12,7 @@ geometry_msgs::Twist acvl;
 
 struct cmd_vel {
 
-    int gear = 1;
+    int gear = 0;
 
     float lx = 0.0;
     float ly = 0.0;

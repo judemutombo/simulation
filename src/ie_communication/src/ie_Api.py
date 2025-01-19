@@ -142,11 +142,12 @@ class ie_API_Server:
             rospy.logerr(f"Error processing and emitting map feed: {e}")
 
     async def gearCallback(self, data, sid):
+        print(data)
         rospy.wait_for_service('change_gear')
         robot_gear = rospy.ServiceProxy('change_gear', robotGear)
         robot_gear.wait_for_service(10)
         try:
-            response = robot_gear(0)
+            response = robot_gear(data["gear"])
             if response.message:
                 await self.sio.emit("gear_response", {"response": "changed"}, to=sid)
             else:
@@ -156,7 +157,6 @@ class ie_API_Server:
             print("Service did not process request: " + str(exc))
 
     async def taskCallback(self, sid, task):
-        print(task)
         t = TaskData()
         t.task_name = task['task']["task_name"]
         t.params =  [Param(zone=key,type=value) for key, value in task['task']["params"].items()]

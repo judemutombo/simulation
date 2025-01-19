@@ -3,6 +3,7 @@ import rospy
 from task import Task
 import signalslot
 import sqlite3
+import os
 
 class Mapping(Task):
 
@@ -13,32 +14,40 @@ class Mapping(Task):
     def start(self):
         if self._checkExistingQrCodes():
             self.fsignal.emit(qrcodes=self.qrcodes)
-            super()._task_finished()
+            super()._finish_task(success=True, message="Mapping process finished")
         else:
             super().start()
 
 
     def _check_qr(self, decoded_text):
-        if decoded_text[0] == "None" or decoded_text[0] is None:
-            return
-        if decoded_text[0] != self._lastQrCode:
-            print(f"QR Code: {decoded_text[0]}")
-            if (decoded_text[0] in self.qrcodes):
-                self._task_finished()
+        if not self._processQrCode :
+            self._processQrCode = True
+            if decoded_text[0] == "None" or decoded_text[0] is None:
+                self._processQrCode = False
                 return
             
-            self._lastQrCode = decoded_text[0]
-            self.hasDetectedQrRecently = True
-            position = self._calculate_distance(self.robot_pose)
-            self.qrcodes[decoded_text[0]] = position
-            print(f"Position: {position}")
+            if decoded_text[0] != self._lastQrCode:
+                print(f"QR Code: {decoded_text[0]}")
+                if len(self.qrcodes) >= 1:
+                    if (decoded_text[0] == list(self.qrcodes.keys())[0]):
+                        self._processQrCode = False
+                        self._finish_task(success=True, message="Mapping process finished")
+                        return
+                
+                self._lastQrCode = decoded_text[0]
+                self.hasDetectedQrRecently = False
+                position = self._calculate_distance(self.robot_pose)
+                self.qrcodes[decoded_text[0]] = position
+                print(f"Position: {position}")
+                self._processQrCode = False
+            self._processQrCode = False
 
-    def _task_finished(self):
+    def _finish_task(self, success=True, message=None):
 
         self._running = False
         self._store()
         self.fsignal.emit(qrcodes=self.qrcodes)
-        super()._task_finished()
+        super()._finish_task(success, message)
 
     def _store(self):
         connection = sqlite3.connect("qr_code.db")
@@ -72,7 +81,6 @@ class Mapping(Task):
             connection.close()
             return len(rows) > 0
         except :
-            print('no qr code found')
             return False
     
 if __name__ == '__main__':
