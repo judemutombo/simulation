@@ -143,6 +143,10 @@
       <real_time_update_rate>1000</real_time_update_rate>
     </physics>
     <wind/>
+    <plugin name="gazebo_ros" filename="libgazebo_ros_init.so">
+      <robotNamespace>/</robotNamespace>
+    </plugin>
+
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <latitude_deg>0</latitude_deg>

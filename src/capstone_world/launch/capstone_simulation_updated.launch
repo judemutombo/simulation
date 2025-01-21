@@ -1,5 +1,4 @@
 <launch>
-  <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi, waffle_2cam, bot]"/>
   <arg name="x_pos" default="-4.492939"/>
   <arg name="y_pos" default="6.768950"/>
   <arg name="z_pos" default="0.0"/>
@@ -8,18 +7,15 @@
 
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="world_name" default="$(find capstone_world)/worlds/competition_area.world" />
-    <arg name="paused" value="false"/>
-    <arg name="use_sim_time" value="true"/>
-    <arg name="gui" value="true"/>
-    <arg name="headless" value="false"/>
-    <arg name="debug" value="false"/>
   </include>
 
+  <param name="robot_description" command="$(find xacro)/xacro '$(find turtlebot5)/urdf/turtlebot5.urdf.xarco'" /> 
+
+  <rosparam command="load" file="$(find turtlebot5)/urdf/controller.yaml"/>
 
 
-  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
+  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
+	args="-urdf -model turtlebot5 -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -R 0 -P 0 -Y $(arg yaw) -param robot_description"/> 
   <param name="render_engine" value="ogre"/>
-  <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf"  args="-urdf -model turtlebot3_$(arg model) -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -R 0 -P 0 -Y $(arg yaw) -param robot_description" output="log"/>
-  
-
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" args="position_joint_controller" />
 </launch>

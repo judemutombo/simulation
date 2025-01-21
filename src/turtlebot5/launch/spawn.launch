@@ -1,12 +1,32 @@
-<launch>
-  <!-- Load the robot URDF model -->
-  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot5)/urdf/turtlebot5.urdf.xarco" />
+<?xml version="1.0" ?>
 
-  <!-- Spawn the robot in Gazebo -->
-  <node 
-    name="spawn_robot" 
-    type="gazebo" 
-    pkg="gazebo_ros" 
-    args="-s `find gazebo_ros/config`/empty_worlds/empty.world --robot-name turtlebot5 --model turtlebot5" 
-    output="screen"/>
+<launch>
+
+  <!-- these are the arguments you can pass this launch file, for example paused:=true -->
+  <arg name="paused" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="gui" default="true"/>
+  <arg name="headless" default="false"/>
+  <arg name="debug" default="false"/>
+
+  <!-- We resume the logic in empty_world.launch -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="gui" value="$(arg gui)" />
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    <arg name="headless" value="$(arg headless)"/>
+  </include>
+
+  <!-- Load the URDF into the ROS Parameter Server -->
+  <param name="robot_description" command="$(find xacro)/xacro '$(find turtlebot5)/urdf/turtlebot5.urdf.xarco'" /> 
+
+  <rosparam command="load" file="$(find turtlebot5)/urdf/controller.yaml"/>
+
+  <!-- Run a python script to the send a service call to gazebo_ros to spawn a URDF robot -->
+  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
+	args="-urdf -model turtlebot5 -param robot_description"/> 
+
+ <!-- Start the controller manager and load the position joint controller -->
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" args="position_joint_controller" />
 </launch>
