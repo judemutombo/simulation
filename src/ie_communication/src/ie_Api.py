@@ -142,7 +142,7 @@ class ie_API_Server:
             rospy.logerr(f"Error processing and emitting map feed: {e}")
 
     async def gearCallback(self, data, sid):
-        print(data)
+        # print(data)
         rospy.wait_for_service('change_gear')
         robot_gear = rospy.ServiceProxy('change_gear', robotGear)
         robot_gear.wait_for_service(10)

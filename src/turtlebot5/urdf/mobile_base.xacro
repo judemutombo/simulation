@@ -14,6 +14,10 @@
 <xacro:property name="lidar_r" value="0.025" />
 <xacro:property name="lidar_l" value="0.0215" />
 
+<xacro:property name="r200_cam_rgb_px" value="0.005"/>
+<xacro:property name="r200_cam_rgb_py" value="0"/>
+<xacro:property name="r200_cam_rgb_pz" value="0.013"/>
+<xacro:property name="r200_cam_depth_offset" value="0.01"/>
 
 
 <link name="base_footprint">
@@ -167,12 +171,12 @@
   </visual>
 </link>
 <link name="camera_link_2">
-    <visual>
-        <origin xyz="0 0 0" rpy="1.57 0 1.57"/>
+    <!-- <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
             <box size="0.025 0.025 0.025"/>
         </geometry>
-    </visual>
+    </visual> -->
     <collision>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
@@ -203,7 +207,7 @@
     <parent link="base_link"/>
     <child link="platform_lift_link"/>
     <axis xyz="0 0 1"/> <!-- Movement along the Z-axis -->
-     <limit lower="0.0" upper="${(base_hight * 0.87)}" effort="50" velocity="1.0"/> <!-- Motion range and limits -->
+     <limit lower="0.04" upper="${(base_hight * 0.87)}" effort="2500" velocity="1.0"/> <!-- Motion range and limits -->
 </joint>
 
 <joint name="base_lidar_joint" type="fixed">
@@ -241,13 +245,40 @@
 <joint name="camera_joint" type="fixed">
   <parent link="base_link"/>
   <child link="camera_link"/>
-  <origin xyz="${(base_length/2) + 0.009} 0 0.094" rpy="0 0 0"/>
+  <origin xyz="${(base_length/2) + 0.009} 0 ${0.094 + 0.05209 - (base_hight/2.0)}" rpy="0 0 0"/>
 </joint>
+
+<joint name="camera_rgb_joint" type="fixed">
+  <origin xyz="0 0 ${r200_cam_rgb_pz}" rpy="0 1.05 0"/>
+  <parent link="camera_link"/>
+  <child link="camera_rgb_frame"/>
+</joint>
+<link name="camera_rgb_frame"/>
+<joint name="camera_rgb_optical_joint" type="fixed">
+  <origin xyz="0 0 0" rpy="-1.57 0 -1.57"/>
+  <parent link="camera_rgb_frame"/>
+  <child link="camera_rgb_optical_frame"/>
+</joint>
+<link name="camera_rgb_optical_frame"/>
+
+<joint name="camera_depth_joint" type="fixed">
+  <origin xyz="${r200_cam_rgb_px} ${r200_cam_rgb_py + r200_cam_depth_offset} ${r200_cam_rgb_pz}" rpy="0 0 0"/>
+  <parent link="camera_link"/>
+  <child link="camera_depth_frame"/>
+</joint>
+<link name="camera_depth_frame"/>
+
+<joint name="camera_depth_optical_joint" type="fixed">
+  <origin xyz="0 0 0" rpy="-1.57 0 -1.57"/>
+  <parent link="camera_depth_frame"/>
+  <child link="camera_depth_optical_frame"/>
+</joint>
+<link name="camera_depth_optical_frame"/>
 
 <joint name="camera_joint_2" type="fixed">
   <parent link="base_link"/>
   <child link="camera_link_2"/>
-  <origin xyz="${(base_length/2) + 0.009} 0 0.05" rpy="0 1.05 0"/> <!-- Adjusted rpy to face the ground -->
+  <origin xyz="${(base_length/2) + 0.009} ${r200_cam_rgb_py} 0.098" rpy="0 0.5 0"/> <!-- Adjusted rpy to face the ground -->
 </joint>
 
 </robot>

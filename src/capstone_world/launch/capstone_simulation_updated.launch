@@ -1,5 +1,5 @@
 <launch>
-  <arg name="x_pos" default="-4.492939"/>
+  <arg name="x_pos" default="-4.477200"/>
   <arg name="y_pos" default="6.768950"/>
   <arg name="z_pos" default="0.0"/>
   <arg name="yaw" default="-1.600000"/>
@@ -14,8 +14,8 @@
   <rosparam command="load" file="$(find turtlebot5)/urdf/controller.yaml"/>
 
 
-  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
+  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="log"
 	args="-urdf -model turtlebot5 -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -R 0 -P 0 -Y $(arg yaw) -param robot_description"/> 
   <param name="render_engine" value="ogre"/>
-  <node name="controller_spawner" pkg="controller_manager" type="spawner" args="position_joint_controller" />
+
 </launch>

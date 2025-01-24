@@ -21,7 +21,7 @@ class CameraController:
         self._cam_available = False
         self._cam1Frame = None
         self._cam2Frame = None
-        print("cameraController initialized")
+        # print("cameraController initialized")
 
     def _camera1Process(self, data):
         try:
@@ -47,7 +47,7 @@ class CameraController:
 
     def _changeCameraState(self, req):
         self._camState = req.state
-        print(f"Camera state changed to: {self._camState}")
+        # print(f"Camera state changed to: {self._camState}")
         return camStateResponse(success=True)
 
     def _provideCamFeed(self) -> None:

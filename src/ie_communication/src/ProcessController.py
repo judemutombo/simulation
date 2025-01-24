@@ -25,7 +25,7 @@ class ProcessController :
     
     def setTask(self, req):
         rospy.loginfo(f"Received task request: {req.task.task_name}")
-        if self._proccessing == True:
+        if self._proccessing == True and self._currentTask is not None:
             if self._currentTask.running:
                 return robotTaskResponse("a process is already running")
 

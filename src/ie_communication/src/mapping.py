@@ -34,11 +34,11 @@ class Mapping(Task):
                         self._finish_task(success=True, message="Mapping process finished")
                         return
                 
-                self._lastQrCode = decoded_text[0]
                 self.hasDetectedQrRecently = False
                 position = self._calculate_distance(self.robot_pose)
                 self.qrcodes[decoded_text[0]] = position
                 print(f"Position: {position}")
+                self._lastQrCode = decoded_text[0]
                 self._processQrCode = False
             self._processQrCode = False
 

@@ -21,7 +21,7 @@ class Task:
         self.rate = rospy.Rate(10)
         self.msg = Twist()
         self.bridge = CvBridge()
-        self.param = {"KP": 500, "SP": 0.08, "TLSP" : 0.08, "TRSP" : 0.05, "MSP" : 1.5}
+        self.param = {"KP": 500, "SP": 0.08, "TLSP" : 0.07, "TRSP" : 0.07, "MSP" : 1.5}
         self.task = task
         self._running = False
 
@@ -35,8 +35,8 @@ class Task:
         self._subcamqr = rospy.Subscriber("/camera_qr_code_feed",Image, self._camqrProcess)
         self.sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
         self.img_size = None
-        self._black_pixels = 492250
-        self._threshold = 0.078
+        self._black_pixels = 493850
+        self._threshold = 0.112
         self._middle_width = 580
         self.timer = None
         self.qrcodes = {}
@@ -87,19 +87,7 @@ class Task:
             rospy.logerr(f"Error converting image: {e}")
 
     def _check_qr(self, decoded_text):
-        if decoded_text[0] == "None" or decoded_text[0] is None:
-            return
-        
-        if decoded_text[0] != self._lastQrCode:
-            if (decoded_text[0] in self.qrcodes):
-                return
-            
-            self._lastQrCode = decoded_text[0]
-            self.hasDetectedQrRecently = True
-            position = self._calculate_distance(self.robot_pose)
-            self.qrcodes[decoded_text[0]] = position
-            print(f"QR Code: {decoded_text[0]}")
-            print(f"Position: {position}")
+        pass
 
     def _move_forward(self):
         """Move forward at a constant speed."""
@@ -110,7 +98,7 @@ class Task:
     def _turn_left(self):
         """Turn the robot to the left."""
         print("Left")
-        self.msg.linear.x = self.param["TRSP"]
+        self.msg.linear.x = self.param["TLSP"]
         self.msg.angular.z = 0.5
         self.pub2.publish(self.msg)
 
@@ -263,7 +251,6 @@ class Task:
         self.stop()
         self.needMakeDecision = False
         self.hasDetectedQrRecently = False
-        self._lastQrCode = None
         if self.timer:
             self.timer.shutdown()  # Clean up the timer
 
@@ -387,5 +374,6 @@ if __name__ == '__main__':
 
     rospy.init_node('Threshold')
     th = Task(task="mapping")
+    th.start()
     rospy.spin()
     

@@ -7,7 +7,7 @@
     <include file="$(find ie_communication)/launch/lch.launch">
     </include>
 
-    <!-- <include file="$(find turtlebot3_slam)/launch/turtlebot3_slam.launch">
+<!--     <include file="$(find turtlebot3_slam)/launch/turtlebot3_slam.launch">
     </include>  -->
     
 </launch>   

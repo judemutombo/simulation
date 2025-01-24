@@ -68,7 +68,7 @@ class Carrying(Task):
             current = self._params[self._currentTask]
             
             # check if the robot scan a qrCode recently
-            if self._lastQrCode is None: # no qrCode has been scanned
+            if not self.hasDetectedQrRecently: # no qrCode has been scanned
 
                 if onTop: # if not qrCode has been scanned just go straight
                     tm = 1
