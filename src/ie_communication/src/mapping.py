@@ -31,7 +31,7 @@ class Mapping(Task):
                 if len(self.qrcodes) >= 1:
                     if (decoded_text[0] == list(self.qrcodes.keys())[0]):
                         self._processQrCode = False
-                        self._finish_task(success=True, message="Mapping process finished")
+                        self._task_finished(message="Mapping process finished")
                         return
                 
                 self.hasDetectedQrRecently = False
@@ -42,12 +42,11 @@ class Mapping(Task):
                 self._processQrCode = False
             self._processQrCode = False
 
-    def _finish_task(self, success=True, message=None):
-
+    def _task_finished(self, message):
         self._running = False
         self._store()
+        super()._task_finished(message)
         self.fsignal.emit(qrcodes=self.qrcodes)
-        super()._finish_task(success, message)
 
     def _store(self):
         connection = sqlite3.connect("qr_code.db")

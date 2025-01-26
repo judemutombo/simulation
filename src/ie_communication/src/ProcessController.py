@@ -49,6 +49,7 @@ class ProcessController :
                 elif req.task.task_name == "carrying":
                     params = [{"zone" :kv.zone, "type": kv.type} for kv in req.task.params]
                     self._currentTask = Carrying(params)
+                    self._currentTask.fsignal.connect(self._carrying_finished)
                     self._currentTask.finishedSignal.connect(self._task_finished)
                     self._currentTask.failedSignal.connect(self._task_failed)
                     self._currentTask.start()
@@ -79,8 +80,17 @@ class ProcessController :
         self._publishProcessState()
 
     def _task_failed(self, message, **kwargs):
+        rospy.loginfo(f"Message from task : {message}")
+        self._proccessing = False
         self._currentTask.stop()
         self._currentTask = None
+        rospy.wait_for_service('output')
+        robot_task = rospy.ServiceProxy('output', taskMessage)
+        robot_task.wait_for_service(10)
+        try:
+            response = robot_task(message)
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))
         rospy.logerr(message)
 
     def _mapping_finished(self, qrcodes, **kwargs):
@@ -97,6 +107,12 @@ class ProcessController :
             response = mo(key_value_array)
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
+
+    def _carrying_finished(self, messages, **kwargs):
+        self._proccessing = False
+        self._currentTask.stop()
+        self._currentTask = None
+        rospy.loginfo("Carrying process finished")
 
     def _publishProcessState(self):
         state = "Processing" if self._currentTask is not None else "Stationary"

@@ -68,13 +68,13 @@
     <material name="grey"/>
   </visual> 
   <collision>
-      <origin xyz="0.0 0.0 0.0" rpy="${pi / 2.0} 0.0 0.0"/>
+      <origin xyz="0.0 0.0 ${0.18/2}" rpy="0.0 0.0 0.0"/>
     <geometry>
         <cylinder radius="${0.05}" length="${0.18}"/>
     </geometry>
     <material name="red"/>
   </collision>   
-  <xacro:cylinder_inertia m="1.0" r="${2*wheel_r}" h="${2*wheel_length}" xyz="0.0 0.0 0.0" rpy="${pi / 2.0} 0.0 0.0" />
+  <xacro:cylinder_inertia m="1.0" r="${2*wheel_r}" h="${2*wheel_length}" xyz="0.0 0.0 ${0.18/2}" rpy="0.0 0.0 0.0" />
 </link>
 
 <link name="lidar_link">

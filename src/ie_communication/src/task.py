@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import rospy
 from sensor_msgs.msg import Image
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Float64
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 from qreader import QReader
@@ -31,16 +31,17 @@ class Task:
 
         self.pub = rospy.Publisher("/error", Float32, queue_size=1)
         self.pub2 = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
+        self.liftPub = rospy.Publisher("/position_joint_controller/command", Float64, queue_size=10)
         self.stop()
         self._subcamqr = rospy.Subscriber("/camera_qr_code_feed",Image, self._camqrProcess)
         self.sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
         self.img_size = None
         self._black_pixels = 493850
-        self._threshold = 0.112
+        self._threshold = 0.119
         self._middle_width = 580
         self.timer = None
         self.qrcodes = {}
-        self.distanceToQr = 0.4334 
+        self.distanceToQr = 0.3059 
         self.finishedSignal = signalslot.Signal(args=['message'])
         self.failedSignal = signalslot.Signal(args=['message'])
         self._processQrCode =  False
@@ -230,7 +231,6 @@ class Task:
 
     def junction_decision(self, onLeft, onRight, onTop):
         print("Making decision")
-        self.stop()
         tm = 3
         if self.task == "mapping":
             if onTop:
@@ -362,7 +362,7 @@ class Task:
         else:
             self.failedSignal.emit(message=f"{self.task} process failed: {message}")
 
-    def _task_finished(self):
+    def _task_finished(self, message):
         self._finish_task(success=True)
 
     def _task_failed(self, message):

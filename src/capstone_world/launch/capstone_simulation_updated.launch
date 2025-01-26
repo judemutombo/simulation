@@ -18,4 +18,8 @@
 	args="-urdf -model turtlebot5 -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -R 0 -P 0 -Y $(arg yaw) -param robot_description"/> 
   <param name="render_engine" value="ogre"/>
 
+  
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+        output="screen" args="position_joint_controller" />
+
 </launch>

@@ -15,7 +15,7 @@
         </inertia>
       </inertial>
       <collision name='surface_collision'>
-        <pose>0 0 0.55 0 0 0</pose>
+        <pose>0 0 0.367 0 0 0</pose>
         <geometry>
           <box>
             <size>1.1 0.95 0.03</size>
@@ -31,7 +31,7 @@
         </surface>
       </collision>
       <visual name='surface_visual'>
-        <pose>0 0 0.55 0 0 0</pose>
+        <pose>0 0 0.367 0 0 0</pose>
         <geometry>
           <box>
             <size>1.1 0.95 0.03</size>
@@ -61,11 +61,11 @@
         </inertia>
       </inertial>
       <collision name='collision'>
-        <pose>0.53 0.455 0.275 0 0 0</pose>
+        <pose>0.53 0.455 0.1835 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.02</radius>
-            <length>0.55</length>
+            <length>0.367</length>
           </cylinder>
         </geometry>
         <surface>
@@ -84,11 +84,11 @@
         </surface>
       </collision>
       <visual name='visual'>
-        <pose>0.53 0.455 0.275 0 0 0</pose>
+        <pose>0.53 0.455 0.1835 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.02</radius>
-            <length>0.55</length>
+            <length>0.367</length>
           </cylinder>
         </geometry>
         <material>
@@ -114,11 +114,11 @@
         </inertia>
       </inertial>
       <collision name='collision'>
-        <pose>0.53 -0.455 0.275 0 0 0</pose>
+        <pose>0.53 -0.455 0.1835 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.02</radius>
-            <length>0.55</length>
+            <length>0.367</length>
           </cylinder>
         </geometry>
         <surface>
@@ -137,11 +137,11 @@
         </surface>
       </collision>
       <visual name='visual'>
-        <pose>0.53 -0.455 0.275 0 0 0</pose>
+        <pose>0.53 -0.455 0.1835 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.02</radius>
-            <length>0.55</length>
+            <length>0.367</length>
           </cylinder>
         </geometry>
         <material>
@@ -167,11 +167,11 @@
         </inertia>
       </inertial>
       <collision name='collision'>
-        <pose>-0.53 0.455 0.275 0 0 0</pose>
+        <pose>-0.53 0.455 0.1835 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.02</radius>
-            <length>0.55</length>
+            <length>0.367</length>
           </cylinder>
         </geometry>
         <surface>
@@ -190,11 +190,11 @@
         </surface>
       </collision>
       <visual name='visual'>
-        <pose>-0.53 0.455 0.275 0 0 0</pose>
+        <pose>-0.53 0.455 0.1835 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.02</radius>
-            <length>0.55</length>
+            <length>0.367</length>
           </cylinder>
         </geometry>
         <material>
@@ -220,11 +220,11 @@
         </inertia>
       </inertial>
       <collision name='collision'>
-        <pose>-0.53 -0.455 0.275 0 0 0</pose>
+        <pose>-0.53 -0.455 0.1835 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.02</radius>
-            <length>0.55</length>
+            <length>0.367</length>
           </cylinder>
         </geometry>
         <surface>
@@ -243,11 +243,11 @@
         </surface>
       </collision>
       <visual name='visual'>
-        <pose>-0.53 -0.455 0.275 0 0 0</pose>
+        <pose>-0.53 -0.455 0.1835 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.02</radius>
-            <length>0.55</length>
+            <length>0.367</length>
           </cylinder>
         </geometry>
         <material>
@@ -263,25 +263,25 @@
     <joint name='front_left_joint' type='fixed'>
       <parent>table_surface</parent>
       <child>front_left_leg</child>
-      <pose>0.53 0.455 0.275 0 0 0</pose>
+      <pose>0.53 0.455 0.1835 0 0 0</pose>
     </joint>
 
     <joint name='front_right_joint' type='fixed'>
       <parent>table_surface</parent>
       <child>front_right_leg</child>
-      <pose>0.53 -0.455 0.275 0 0 0</pose>
+      <pose>0.53 -0.455 0.1835 0 0 0</pose>
     </joint>
 
     <joint name='back_left_joint' type='fixed'>
       <parent>table_surface</parent>
       <child>back_left_leg</child>
-      <pose>-0.53 0.455 0.275 0 0 0</pose>
+      <pose>-0.53 0.455 0.1835 0 0 0</pose>
     </joint>
 
     <joint name='back_right_joint' type='fixed'>
       <parent>table_surface</parent>
       <child>back_right_leg</child>
-      <pose>-0.53 -0.455 0.275 0 0 0</pose>
+      <pose>-0.53 -0.455 0.1835 0 0 0</pose>
     </joint>
   </model>
 </sdf>
