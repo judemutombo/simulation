@@ -1,8 +1,5 @@
 .vscode
 robot_description
 build
-turtlebot5_navigation
-turtlebot5_bringup
-turtlebot5/config
-turtlebot5/launch
+
 

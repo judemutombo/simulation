@@ -129,6 +129,11 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
+        platform_lift_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -156,6 +161,8 @@ Visualization Manager:
           Value: true
         wheel_right_link:
           Value: true
+        platform_lift_link:
+          Value: true
       Marker Scale: 0.4000000059604645
       Name: TF
       Show Arrows: true
@@ -175,12 +182,17 @@ Visualization Manager:
                 {}
               wheel_right_link:
                 {}
+              platform_lift_link:
+                platform_link:
+                  {}
       Update Interval: 0
       Value: true
   Enabled: true
   Global Options:
     Background Color: 108; 108; 108
-    Fixed Frame: base_footprint
+    Fixed Frame: map
+    RobotModel: Enabled
+    TF: Enabled
     Frame Rate: 30
   Name: root
   Tools:

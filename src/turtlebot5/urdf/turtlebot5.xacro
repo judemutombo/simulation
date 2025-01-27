@@ -41,6 +41,24 @@
   <xacro:box_inertia m="5.0" l="${2*base_length}" w="${2*base_width}" h="${2*base_hight}" xyz="0.0 0.0 ${base_hight/2.0}" rpy="0.0 0.0 0.0"/>
 </link>
 
+<link name="platform_lift_link">
+  <visual>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0.0 0.0"/>
+    <geometry>
+        <mesh filename="package://turtlebot5/meshes/inner.stl"/>
+    </geometry>
+    <material name="grey"/>
+  </visual> 
+  <!-- <collision>
+      <origin xyz="0.0 0.0 ${0.18/2}" rpy="0.0 0.0 0.0"/>
+    <geometry>
+        <cylinder radius="${0.05}" length="${0.18}"/>
+    </geometry>
+    <material name="red"/>
+  </collision>    -->
+  <xacro:cylinder_inertia m="1.0" r="${2*wheel_r}" h="${2*wheel_length}" xyz="0.0 0.0 ${0.18/2}" rpy="0.0 0.0 0.0" />
+</link>
+
 <link name="platform_link">
   <visual>
     <geometry>
@@ -59,25 +77,7 @@
   <xacro:box_inertia m="5.0" l="0.35" w="0.22" h="0.026" xyz="0.0 0.0 0" rpy="0.0 0.0 0.0"/>
 </link>
 
-<link name="platform_lift_link">
-  <visual>
-    <origin xyz="0.0 0.0 0.0" rpy="0 0.0 0.0"/>
-    <geometry>
-        <mesh filename="package://turtlebot5/meshes/inner.stl"/>
-    </geometry>
-    <material name="grey"/>
-  </visual> 
-  <collision>
-      <origin xyz="0.0 0.0 ${0.18/2}" rpy="0.0 0.0 0.0"/>
-    <geometry>
-        <cylinder radius="${0.05}" length="${0.18}"/>
-    </geometry>
-    <material name="red"/>
-  </collision>   
-  <xacro:cylinder_inertia m="1.0" r="${2*wheel_r}" h="${2*wheel_length}" xyz="0.0 0.0 ${0.18/2}" rpy="0.0 0.0 0.0" />
-</link>
-
-<link name="lidar_link">
+<link name="base_scan">
     <visual name="">
         <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
         <geometry>
@@ -93,7 +93,7 @@
     </collision>
 </link>
 
-<link name="left_wheel_link">
+<link name="wheel_left_link">
   <visual>
     <origin xyz="0.0 0.0 0.0" rpy="${pi / 2.0} 0.0 0.0"/>
     <geometry>
@@ -110,7 +110,7 @@
   <xacro:cylinder_inertia m="1.0" r="${2*wheel_r}" h="${2*wheel_length}" xyz="0.0 0.0 0.0" rpy="${pi / 2.0} 0.0 0.0" />
 </link>
 
-<link name="right_wheel_link">
+<link name="wheel_right_link">
   <visual>
       <origin xyz="0.0 0.0 0.0" rpy="${pi / 2.0} 0.0 0.0"/>
       <geometry>
@@ -207,25 +207,25 @@
     <parent link="base_link"/>
     <child link="platform_lift_link"/>
     <axis xyz="0 0 1"/> <!-- Movement along the Z-axis -->
-     <limit lower="0.04" upper="${(base_hight * 0.87)}" effort="2500" velocity="1.0"/> <!-- Motion range and limits -->
+    <limit lower="0.04" upper="${(base_hight * 0.87)}" effort="2500" velocity="1.0"/> <!-- Motion range and limits -->
 </joint>
 
 <joint name="base_lidar_joint" type="fixed">
     <parent link="base_link"/>
-    <child link="lidar_link"/>
+    <child link="base_scan"/>
     <origin xyz="${(base_length / 2)- lidar_r} 0.0 ${(base_hight + lidar_l / 2) - 0.005}" rpy="0.0 0.0 0.0"/>        
 </joint>
 
-<joint name="left_wheel_joint" type="continuous">
+<joint name="wheel_left_joint" type="continuous">
     <parent link="base_link"/>
-    <child link="left_wheel_link"/>
+    <child link="wheel_left_link"/>
     <origin xyz="0 ${(base_width + wheel_length)/2.0} 0.0" rpy="0.0 0.0 0.0"/>
     <axis xyz="0 1 0.0"/>
 </joint>
 
-<joint name="right_wheel_joint" type="continuous">
+<joint name="wheel_right_joint" type="continuous">
     <parent link="base_link"/>
-    <child link="right_wheel_link"/>
+    <child link="wheel_right_link"/>
     <origin xyz=" 0 ${-(base_width + wheel_length)/2.0} 0.0" rpy="0.0 0.0 0.0"/>
     <axis xyz="0 1 0.0"/>
 </joint>

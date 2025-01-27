@@ -11,14 +11,16 @@
 
   <param name="robot_description" command="$(find xacro)/xacro '$(find turtlebot5)/urdf/turtlebot5.urdf.xarco'" /> 
 
-  <rosparam command="load" file="$(find turtlebot5)/urdf/controller.yaml"/>
+  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
 
 
   <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="log"
 	args="-urdf -model turtlebot5 -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -R 0 -P 0 -Y $(arg yaw) -param robot_description"/> 
-  <param name="render_engine" value="ogre"/>
-
   
+  
+
+  <rosparam command="load" file="$(find turtlebot5)/config/controller.yaml"/>  
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
         output="screen" args="position_joint_controller" />
 

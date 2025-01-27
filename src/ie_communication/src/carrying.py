@@ -192,7 +192,7 @@ class Carrying(Task):
         if not self.isLifting :
             if self.moveToLiftPosition:
                 if self._distanceToLifePosition() > 0.005:
-                    print("Moving to lift position, distance to lift position : ", self._distanceToLifePosition())
+                    #print("Moving to lift position, distance to lift position : ", self._distanceToLifePosition())
                     self._move(error)
                     return None
                 else:
