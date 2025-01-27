@@ -7,7 +7,7 @@ import rospy
 from std_msgs.msg import  Int32, Float32, String
 from sensor_msgs.msg import Image
 from ie_communication.msg import  SensorDataMap, TaskData, Param
-from ie_communication.srv import camState, robotTask, robotGear, taskMessage, taskMessageResponse, mappingOutput, mappingOutputResponse
+from ie_communication.srv import camState, robotTask, robotGear, robotGearResponse, taskMessage, taskMessageResponse, mappingOutput, mappingOutputResponse
 from cv_bridge import CvBridge
 import asyncio
 import uvicorn
@@ -36,11 +36,11 @@ class ie_API_Server:
         # Define services
         rospy.Service('output', taskMessage, self.run_async_taskFinished)
         rospy.Service('mapping_output', mappingOutput, self.run_async_mappingOutput)
+        rospy.Service('gear_changed', robotGear, self.run_async_gearChanged)
 
         # Register event handlers
         self.sio.on("connect", self.onConnect)
         self.sio.on("disconnect", self.onDisconnect)
-        self.sio.on("cameraState", self.cameraStateChange)
         self.sio.on("moveDirection", self.movement)
         self.sio.on("message", self.message)
         self.sio.on("robot_task", self.taskCallback)
@@ -141,17 +141,17 @@ class ie_API_Server:
         except Exception as e:
             rospy.logerr(f"Error processing and emitting map feed: {e}")
 
-    async def gearCallback(self, data, sid):
-        # print(data)
+    async def gearCallback(self, sid, data):
+        print(data)
         rospy.wait_for_service('change_gear')
         robot_gear = rospy.ServiceProxy('change_gear', robotGear)
         robot_gear.wait_for_service(10)
         try:
             response = robot_gear(data["gear"])
             if response.message:
-                await self.sio.emit("gear_response", {"response": "changed"}, to=sid)
+                print("changed")
             else:
-                await self.sio.emit("gear_response", {"response": "Failed"}, to=sid)
+                print("Failed")
             
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
@@ -220,19 +220,6 @@ class ie_API_Server:
     async def onDisconnect(self, sid):
         print(f"client {sid} disconnected")
 
-    async def cameraStateChange(self, sid, state):
-        print(state)
-        rospy.wait_for_service('camera_state')
-        camera_state = rospy.ServiceProxy('camera_state', camState)
-
-        try:
-            if state["state"]:
-                camera_state(True)
-            else:
-                camera_state(False)
-        except rospy.ServiceException as exc:
-            print("Service did not process request: " + str(exc))
-
     async def movement(self, sid, direction):
         print(direction["direction"])
         if direction["direction"] == "UP" :
@@ -263,6 +250,20 @@ class ie_API_Server:
     def _stop(self):
         rospy.loginfo("Server shutting down...")
         self.sio.stop()  # Stop Socket.IO
+    
+    def run_async_gearChanged(self, gear):
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.gearChanged(gear))
+            return robotGearResponse(True)
+        except Exception as e:
+            rospy.logerr(f"Error before proccessing and emitting gearChanged: {e}")
+
+            return robotGearResponse(False)
+    
+    async def gearChanged(self, gear):
+        await self.sio.emit("gear_state", {"gear": gear.state})
 
 if __name__ == '__main__':
     from threading import Thread

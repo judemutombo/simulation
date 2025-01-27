@@ -8,6 +8,8 @@
 #include <cmath>
 
 
+
+
 geometry_msgs::Twist acvl;
 
 struct cmd_vel {
@@ -162,6 +164,19 @@ bool changeGear (ie_communication::robotGear::Request &req, ie_communication::ro
     }else{
         std::cout << "The robot is in manual mode, autonomous control is disabled" << std::endl;
     }
+
+    ros::NodeHandle n;
+    ros::ServiceClient client = n.serviceClient<ie_communication::robotGear>("gear_changed");
+    ie_communication::robotGear srv;
+
+    srv.request.state = movedata.gear;
+
+    if(client.call(srv)){
+
+    }else{
+        ROS_ERROR("Failed to update the gear to GUI");
+    }
+
     res.message = true;
     return true;
 }
@@ -172,10 +187,9 @@ void actualVel(const geometry_msgs::Twist& vel){
 
 int main(int argc, char** argv) {
     // Initialize the ROS node
+    
     ros::init(argc, argv, "movementController");
-
     ros::NodeHandle n;
-
     ros::Subscriber sub = n.subscribe("manual_controller", 1000, callback);
     ros::Subscriber processSub = n.subscribe("ProcessState", 1000, updateProcess);
     ros::Subscriber cvl = n.subscribe("cmd_vel", 1000, actualVel);

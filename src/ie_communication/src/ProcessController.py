@@ -59,7 +59,7 @@ class ProcessController :
 
                 return robotTaskResponse("Task can not be set")
             else :
-                return robotTaskResponse("Task can not be set")
+                return robotTaskResponse("Task can not be set: can't change robot gear")
             
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
@@ -80,7 +80,7 @@ class ProcessController :
         self._publishProcessState()
 
     def _task_failed(self, message, **kwargs):
-        rospy.loginfo(f"Message from task : {message}")
+        rospy.logerr(f"Message from task : {message}")
         self._proccessing = False
         self._currentTask.stop()
         self._currentTask = None
@@ -91,7 +91,9 @@ class ProcessController :
             response = robot_task(message)
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
-        rospy.logerr(message)
+
+        self._publishProcessState()
+
 
     def _mapping_finished(self, qrcodes, **kwargs):
         self._proccessing = False

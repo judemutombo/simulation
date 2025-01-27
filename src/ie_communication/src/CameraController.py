@@ -15,7 +15,6 @@ class CameraController:
         self._subcam1 = rospy.Subscriber("/camera/rgb/image_raw",Image, self._camera1Process)
         self._subcam2 = rospy.Subscriber("/camera_2/camera_2/image_raw",Image, self._camera2Process)
 
-        self._service = rospy.Service('camera_state', camState, self._changeCameraState)
         self._bridge = CvBridge()
         self._camState = True
         self._cam_available = False
@@ -44,11 +43,6 @@ class CameraController:
             self._provideCam2Feed()
         except Exception as e:
             rospy.logerr(f"Error converting image: {e}")
-
-    def _changeCameraState(self, req):
-        self._camState = req.state
-        # print(f"Camera state changed to: {self._camState}")
-        return camStateResponse(success=True)
 
     def _provideCamFeed(self) -> None:
         if self._camState and self._cam_available:
