@@ -41,7 +41,7 @@ class Task:
         self._middle_width = 580
         self.timer = None
         self.qrcodes = {}
-        self.distanceToQr = 0.3059 
+        self.distanceToQr = 0.3869 
         self.finishedSignal = signalslot.Signal(args=['message'])
         self.failedSignal = signalslot.Signal(args=['message'])
         self._processQrCode =  False
@@ -83,6 +83,7 @@ class Task:
             
             decoded_text = self.qreader.detect_and_decode(image=cv_image)
             if decoded_text is not None and len(decoded_text) != 0:
+                print(f"QR Code: {decoded_text[0]}")
                 self._check_qr(decoded_text)
         except Exception as e:
             rospy.logerr(f"Error converting image: {e}")

@@ -1,0 +1,13 @@
+material safety_tape_texture
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture safety_tape.png
+      }
+    }
+  }
+}

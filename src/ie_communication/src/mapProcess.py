@@ -12,61 +12,88 @@ from sensor_msgs.msg import Image
 import math
 
 
-class mapProcess :
-
+class MapProcess:
     def __init__(self):
+        # Initialize ROS node
+        rospy.init_node('map_process', disable_signals=True)
+
+        # Initialize variables
         self.robot_position = None
         self.robot_rotation = None
-        self.pubMap = rospy.Publisher("map_feed", Image, queue_size=10)
+        self.latest_map = None
+        self.bridge = CvBridge()
 
+        # Publishers and Subscribers
+        self.pub_map = rospy.Publisher("map_feed", Image, queue_size=10)
         rospy.Subscriber("/map", OccupancyGrid, self.map_callback)
+
+        # TF2 listener
         self.tf_buffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tf_buffer)
 
+        # Timer for fixed-rate processing
+        self.timer = rospy.Timer(rospy.Duration(0.1), self.timer_callback)  # 10 Hz
+
     def tf_listener(self):
+        """
+        Get the robot's position and orientation from the TF tree.
+        """
         try:
             # Lookup the transform from base_link to map
             transform = self.tf_buffer.lookup_transform("map", "base_link", rospy.Time(0), rospy.Duration(1.0))
-            
-            # Extract position from the transform
+
+            # Extract position and rotation from the transform
             self.robot_position = transform.transform.translation
             self.robot_rotation = transform.transform.rotation
-            # rospy.loginfo("Robot position: x=%.2f, y=%.2f", self.robot_position.x, self.robot_position.y)
-        
+            rospy.loginfo_once("Robot position and rotation updated.")
+
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn("Could not get transform: %s", str(e))
 
     def map_callback(self, data):
-        if self.robot_position is None or self.robot_rotation is None:
-            return  # Wait for the robot's position to be available
+        """
+        Callback for the /map topic. Stores the latest map data.
+        """
+        self.latest_map = data
+        rospy.loginfo_once("Map data received.")
 
-        # Create a CvBridge object to convert ROS messages to OpenCV format
-        bridge = CvBridge()
+    def timer_callback(self, event):
+        """
+        Timer callback for fixed-rate processing of the map and robot position.
+        """
+        # Get the latest robot position and orientation
+        self.tf_listener()
 
+        # Process the map if it's available
+        if self.latest_map is not None and self.robot_position is not None and self.robot_rotation is not None:
+            self.process_map(self.latest_map)
+
+    def process_map(self, map_data):
+        """
+        Process the map data and overlay the robot's position and orientation.
+        """
         # Convert the OccupancyGrid data to a NumPy array
-        # The map data in OccupancyGrid is a 1D list, reshape it into a 2D array (height x width)
-        width = data.info.width
-        height = data.info.height
-        map_data = np.array(data.data, dtype=np.int8).reshape((height, width))
+        width = map_data.info.width
+        height = map_data.info.height
+        map_array = np.array(map_data.data, dtype=np.int8).reshape((height, width))
 
         # Normalize the map values to [0, 255] for OpenCV visualization
-        # Typically, values are -1 (unknown), 0 (free), and 100 (occupied)
-        map_image = np.zeros_like(map_data, dtype=np.uint8)
-        map_image[map_data == 100] = 0  # Occupied cells become white
-        map_image[map_data == 0] = 255      # Free cells become black
-        map_image[map_data == -1] = 127   # Unknown cells become gray
+        map_image = np.zeros_like(map_array, dtype=np.uint8)
+        map_image[map_array == 100] = 0    # Occupied cells (black)
+        map_image[map_array == 0] = 255    # Free cells (white)
+        map_image[map_array == -1] = 127   # Unknown cells (gray)
 
-        
-        robot_x_pixel = int((self.robot_position.x - data.info.origin.position.x) / data.info.resolution)
-        robot_y_pixel = int((self.robot_position.y - data.info.origin.position.y) / data.info.resolution)
-        
-        # Scale position to make the robot visible on the map
-        scale = 1
-        robot_x_pixel *= scale
-        robot_y_pixel *= scale
+        # Convert robot's position from map frame to pixel coordinates
+        robot_x_pixel = int((self.robot_position.x - map_data.info.origin.position.x) / map_data.info.resolution)
+        robot_y_pixel = int((self.robot_position.y - map_data.info.origin.position.y) / map_data.info.resolution)
+
+        # Ensure the robot's position is within the map bounds
+        if not (0 <= robot_x_pixel < width and 0 <= robot_y_pixel < height):
+            rospy.logwarn(f"Robot position ({robot_x_pixel}, {robot_y_pixel}) is outside the map bounds.")
+            return
 
         # Draw a red circle at the robot's position
-        map_image = cv2.circle(map_image, (robot_x_pixel, robot_y_pixel), 5, (0, 255, 255), -1)
+        map_image = cv2.circle(map_image, (robot_x_pixel, robot_y_pixel), 5, (0, 0, 255), -1)  # Red circle
 
         # Optionally, draw the robot's orientation (line indicating yaw)
         yaw = self.get_yaw_from_quaternion(self.robot_rotation)  # Use yaw from the transform
@@ -74,8 +101,8 @@ class mapProcess :
         robot_y_end = robot_y_pixel + int(np.sin(yaw) * 10)
 
         # Draw the yaw direction as a line
-        map_image = cv2.line(map_image, (robot_x_pixel, robot_y_pixel), (robot_x_end, robot_y_end), (0, 255, 0), 2)
-        
+        map_image = cv2.line(map_image, (robot_x_pixel, robot_y_pixel), (robot_x_end, robot_y_end), (0, 255, 0), 2)  # Green line
+
         # Flip the image vertically (Y-axis flip)
         map_image = np.flipud(map_image)  # Flip the image along the Y-axis
 
@@ -83,28 +110,29 @@ class mapProcess :
         map_image = cv2.rotate(map_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
         # Save the updated map with robot's position and orientation
-        cv2.imwrite("/tmp/robot_map_with_position.png", map_image)
-        # rospy.loginfo("Map with robot's position saved")
+        output_path = "/tmp/robot_map_with_position.png"
+        cv2.imwrite(output_path, map_image)
+        rospy.loginfo(f"Map with robot's position saved to {output_path}")
 
         # Send the updated map image over SocketIO
-        self.send_image("/tmp/robot_map_with_position.png")
+        self.send_image(output_path)
 
     def send_image(self, image_path):
+        """
+        Send the processed map image over ROS.
+        """
         # Read the image
         img = cv2.imread(image_path)
-        _, img_encoded = cv2.imencode('.png', img)
-
-        # Convert the image to base64
-        img_base64 = base64.b64encode(img_encoded).decode("utf-8")
 
         # Publish the image
-        bridge = CvBridge()
-        self.pubMap.publish(bridge.cv2_to_imgmsg(img, "bgr8"))
+        img_msg = self.bridge.cv2_to_imgmsg(img, "bgr8")
+        self.pub_map.publish(img_msg)
+        rospy.loginfo("Map image published.")
 
     def get_yaw_from_quaternion(self, rotation):
         """
         Extract yaw (rotation around the Z-axis) from a quaternion.
-        
+
         :param rotation: Quaternion (w, x, y, z)
         :return: Yaw angle in radians
         """
@@ -116,16 +144,14 @@ class mapProcess :
         # Calculate yaw from the quaternion using the formula
         siny = 2.0 * (w * z + x * y)
         cosy = 1.0 - 2.0 * (y * y + z * z)
-        
+
         yaw = math.atan2(siny, cosy)  # Result is in radians
         return yaw
-    
-if __name__ == '__main__':
 
-    rospy.init_node('mapProcess', disable_signals=True)
-    map_process = mapProcess()
-    rate = rospy.Rate(10)  # 10 Hz
-    while not rospy.is_shutdown():
-        map_process.tf_listener()  # Get the robot position from tf
-        rate.sleep()
-    rospy.spin()
+
+if __name__ == '__main__':
+    try:
+        map_process = MapProcess()
+        rospy.spin()
+    except rospy.ROSInterruptException:
+        pass
