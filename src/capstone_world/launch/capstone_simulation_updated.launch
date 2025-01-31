@@ -1,6 +1,6 @@
 <launch>
   <arg name="x_pos" default="-4.477200"/>
-  <arg name="y_pos" default="6.768950"/>
+  <arg name="y_pos" default="0.0"/>
   <arg name="z_pos" default="0.0"/>
   <arg name="yaw" default="-1.600000"/>
 
@@ -11,8 +11,8 @@
 
   <param name="robot_description" command="$(find xacro)/xacro '$(find turtlebot5)/urdf/turtlebot5.urdf.xarco'" /> 
 
-  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
-  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" output="log"/>
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="log"/>
 
 
   <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="log"
@@ -22,6 +22,6 @@
 
   <rosparam command="load" file="$(find turtlebot5)/config/controller.yaml"/>  
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
-        output="screen" args="position_joint_controller" />
+        output="log" args="position_joint_controller" />
 
 </launch>

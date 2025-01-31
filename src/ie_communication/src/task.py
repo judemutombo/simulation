@@ -11,12 +11,15 @@ from qreader import QReader
 from nav_msgs.msg import Odometry
 import math
 import signalslot
+from nav_msgs.msg import OccupancyGrid
+import asyncio
 
 class Task:
 
     def __init__(self, task):
         self.robot_pose = None
         rospy.Subscriber("/odom", Odometry, self.odometry_callback)
+        rospy.Subscriber("/map", OccupancyGrid, self.map_callback)
         self.qreader = QReader()
         self.rate = rospy.Rate(10)
         self.msg = Twist()
@@ -45,17 +48,25 @@ class Task:
         self.finishedSignal = signalslot.Signal(args=['message'])
         self.failedSignal = signalslot.Signal(args=['message'])
         self._processQrCode =  False
-        
+        self._making_u_turn = False
+        self._obstacleInFront = False
+
     def running(self):
         return self._running
     
     def start(self):
         self._running = True
-        self._execute()
-
-    def _execute(self):
-        pass
+        # self._execute_timer_callback()
     
+    def _execute_timer_callback(self):
+        """
+        Callback for the ROS timer. This triggers the asynchronous _execute function.
+        """
+        if self._running:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self._execute())
+
     def odometry_callback(self, odom_msg):
         self.robot_pose = odom_msg.pose.pose
 
@@ -83,7 +94,7 @@ class Task:
             
             decoded_text = self.qreader.detect_and_decode(image=cv_image)
             if decoded_text is not None and len(decoded_text) != 0:
-                print(f"QR Code: {decoded_text[0]}")
+                #print(f"QR Code: {decoded_text[0]}")
                 self._check_qr(decoded_text)
         except Exception as e:
             rospy.logerr(f"Error converting image: {e}")
@@ -110,7 +121,15 @@ class Task:
         self.msg.linear.x = self.param["TRSP"]
         self.msg.angular.z = -0.5
         self.pub2.publish(self.msg)
-
+    
+    def _U_turn(self):
+        """Turn the robot in 180°."""
+        print("U turn")
+        self._making_u_turn = True
+        self.msg.linear.x = 0.0
+        self.msg.angular.z = 0.5
+        self.pub2.publish(self.msg)
+        
     def _move(self, error):
         """Move the robot based on the error."""
         self.msg.linear.x = self.param["SP"]
@@ -123,12 +142,23 @@ class Task:
         self.msg.angular.z = 0.0
         self.pub2.publish(self.msg)
 
+    def _store(self):
+        pass
+    
     def _adjust_orientation(self, error, angle, pixels, mask , w_min, h_min):
+
+        if self._obstacleInFront:
+            return None
 
         """Adjust the robot's orientation based on the error."""
         # if not self._autonomous:
         #     return None
-        
+        if self._making_u_turn:
+            print("error", error)
+            if error < 60 or error > -60:
+                self.stop()
+                self._making_u_turn = False
+
         if (w_min < 100 and h_min < 100):
             self._move_forward()
             return None
@@ -247,9 +277,8 @@ class Task:
 
         self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
 
-    def resume_processing(self, event):
+    def resume_processing(self, event = None):
         rospy.loginfo("Resuming image processing")
-        self.stop()
         self.needMakeDecision = False
         self.hasDetectedQrRecently = False
         if self.timer:
@@ -339,8 +368,10 @@ class Task:
                         cv2.putText(image,str(f"Top px:{px[2]}"),(10, 640), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                         cv2.putText(image,str(f"Top px side:{px[3]}"),(10, 720), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                         cv2.putText(image,str(f"Bot px side:{px[4]}"),(10, 800), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        
             else:
-                self._move_forward()
+                if not self._making_u_turn:
+                    self._move_forward()
 
            
             
@@ -368,9 +399,97 @@ class Task:
 
     def _task_failed(self, message):
         self._finish_task(success=False, message=message) 
+    
+    def map_callback(self, data):
+        """
+        Callback function for the /map topic. Updates the map data.
+        """
+        self.map_data = data  # Store the latest map data
+        self.map_info = data.info  # Store the map metadata (resolution, origin, etc.)
 
+    async def check_for_obstacles(self):
+        """
+        Function to check for obstacles in front of the robot.
+        This function should be called periodically (e.g., in the main loop).
+        """
+        if not hasattr(self, 'map_data') or not hasattr(self, 'map_info'):
+            return  # No map data available yet
 
+        # Define the distance threshold for obstacle detection (in meters)
+        obstacle_distance_threshold = 0.5  # Adjust this value as needed (e.g., 0.5 meters)
 
+        # Get the robot's current position from the odometry data
+        if self.robot_pose is None:
+            return  # No pose data available yet
+
+        # Convert the robot's position to map coordinates
+        robot_x = self.robot_pose.position.x
+        robot_y = self.robot_pose.position.y
+
+        # Calculate the robot's orientation (yaw) from the quaternion
+        orientation = self.robot_pose.orientation
+        yaw = math.atan2(2.0 * (orientation.w * orientation.z + orientation.x * orientation.y),
+                        1.0 - 2.0 * (orientation.y**2 + orientation.z**2))
+
+        # Calculate the position in front of the robot based on the obstacle_distance_threshold
+        front_x = robot_x + obstacle_distance_threshold * math.cos(yaw)
+        front_y = robot_y + obstacle_distance_threshold * math.sin(yaw)
+
+        # Convert the front position to map grid coordinates
+        resolution = self.map_info.resolution  # Map resolution (meters per cell)
+        origin_x = self.map_info.origin.position.x
+        origin_y = self.map_info.origin.position.y
+
+        grid_x = int((front_x - origin_x) / resolution)
+        grid_y = int((front_y - origin_y) / resolution)
+
+        # Check if the calculated grid coordinates are within the map bounds
+        if 0 <= grid_x < self.map_info.width and 0 <= grid_y < self.map_info.height:
+            # Get the occupancy value at the front position
+            index = grid_y * self.map_info.width + grid_x
+            occupancy_value = self.map_data.data[index]
+
+            # Check if the cell is occupied (obstacle detected)
+            if occupancy_value > 50:  # Occupancy values above 50 are considered obstacles
+                self._obstacleInFront = True
+                rospy.loginfo("Obstacle detected in front of the robot!")
+                self.stop()  # Stop the robot
+
+                # Wait for 5 seconds while checking if the obstacle is still there
+                start_time = rospy.Time.now()
+                while (rospy.Time.now() - start_time).to_sec() < 5:
+                    # Re-check the occupancy value at the same position
+                    occupancy_value = self.map_data.data[index]
+                    if occupancy_value <= 50:  # Obstacle has moved
+                        rospy.loginfo("Obstacle has been moved. Resuming movement.")
+                        self._obstacleInFront = False # Continue moving
+                        return
+
+                    rospy.sleep(0.1)  # Sleep for a short duration to avoid busy-waiting
+
+                # If the obstacle is still there after 5 seconds, call the contour_obstacle function
+                rospy.loginfo("Obstacle is still present. Calling contour_obstacle function.")
+                self.contour_obstacle()
+
+    def contour_obstacle(self):
+        """
+        Function to handle obstacle contouring. This is a stub and should be implemented
+        with the logic to navigate around the obstacle.
+        """
+        rospy.loginfo("Contouring obstacle...")
+        # Add your logic here to navigate around the obstacle
+        pass
+
+    async def _execute(self):
+        """
+        Main execution loop for the task. This function is called when the task starts.
+        """
+        try:
+            while self._running and not rospy.is_shutdown():
+                await self.check_for_obstacles()  # Check for obstacles asynchronously
+                await asyncio.sleep(0.1)  # Non-blocking sleep to maintain the loop rate
+        except rospy.ROSInterruptException:
+            rospy.logwarn("ROS is shutting down, stopping obstacle checking.")
 if __name__ == '__main__':
 
     rospy.init_node('Threshold')
