@@ -13,6 +13,7 @@ import math
 import signalslot
 from nav_msgs.msg import OccupancyGrid
 import asyncio
+import copy
 
 class Task:
 
@@ -50,12 +51,14 @@ class Task:
         self._processQrCode =  False
         self._making_u_turn = False
         self._obstacleInFront = False
+        self._obstacleChecker = 0
 
     def running(self):
         return self._running
     
     def start(self):
         self._running = True
+        self.timer = rospy.Timer(rospy.Duration(1), self.check_for_obstacles)  # 10 Hz
         # self._execute_timer_callback()
     
     def _execute_timer_callback(self):
@@ -407,7 +410,7 @@ class Task:
         self.map_data = data  # Store the latest map data
         self.map_info = data.info  # Store the map metadata (resolution, origin, etc.)
 
-    async def check_for_obstacles(self):
+    def check_for_obstacles(self, event):
         """
         Function to check for obstacles in front of the robot.
         This function should be called periodically (e.g., in the main loop).
@@ -415,6 +418,7 @@ class Task:
         if not hasattr(self, 'map_data') or not hasattr(self, 'map_info'):
             return  # No map data available yet
 
+        print("check for obstacles")
         # Define the distance threshold for obstacle detection (in meters)
         obstacle_distance_threshold = 0.5  # Adjust this value as needed (e.g., 0.5 meters)
 
@@ -456,20 +460,20 @@ class Task:
                 self.stop()  # Stop the robot
 
                 # Wait for 5 seconds while checking if the obstacle is still there
-                start_time = rospy.Time.now()
-                while (rospy.Time.now() - start_time).to_sec() < 5:
-                    # Re-check the occupancy value at the same position
+                if self._obstacleChecker < 5 :
                     occupancy_value = self.map_data.data[index]
                     if occupancy_value <= 50:  # Obstacle has moved
                         rospy.loginfo("Obstacle has been moved. Resuming movement.")
                         self._obstacleInFront = False # Continue moving
+                        self._obstacleChecker = 0
                         return
-
-                    rospy.sleep(0.1)  # Sleep for a short duration to avoid busy-waiting
-
-                # If the obstacle is still there after 5 seconds, call the contour_obstacle function
-                rospy.loginfo("Obstacle is still present. Calling contour_obstacle function.")
-                self.contour_obstacle()
+                    else:
+                        self._obstacleChecker += 1
+                else :
+                    # If the obstacle is still there after 5 seconds, call the contour_obstacle function
+                    rospy.loginfo("Obstacle is still present. Calling contour_obstacle function.")
+                    self._obstacleChecker = 0
+                    self.contour_obstacle()
 
     def contour_obstacle(self):
         """
@@ -485,11 +489,13 @@ class Task:
         Main execution loop for the task. This function is called when the task starts.
         """
         try:
-            while self._running and not rospy.is_shutdown():
-                await self.check_for_obstacles()  # Check for obstacles asynchronously
-                await asyncio.sleep(0.1)  # Non-blocking sleep to maintain the loop rate
+            while self._running :
+                # await self.check_for_obstacles()  # Check for obstacles asynchronously
+                await asyncio.sleep(1)  # Non-blocking sleep to maintain the loop rate
         except rospy.ROSInterruptException:
             rospy.logwarn("ROS is shutting down, stopping obstacle checking.")
+
+
 if __name__ == '__main__':
 
     rospy.init_node('Threshold')
