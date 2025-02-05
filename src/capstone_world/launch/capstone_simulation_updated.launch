@@ -1,6 +1,6 @@
 <launch>
-  <arg name="x_pos" default="-4.477200"/>
-  <arg name="y_pos" default="0.0"/>
+  <arg name="x_pos" default="2.892220"/>
+  <arg name="y_pos" default="6.993735"/>
   <arg name="z_pos" default="0.0"/>
   <arg name="yaw" default="-1.600000"/>
 

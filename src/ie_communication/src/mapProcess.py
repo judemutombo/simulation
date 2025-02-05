@@ -167,7 +167,7 @@ class MapProcess:
         # Save the updated map with robot's position, orientation, path, and QR codes
         output_path = "/tmp/robot_map_with_position.png"
         cv2.imwrite(output_path, map_image_color)
-        rospy.loginfo(f"Map with robot's position, path, and QR codes saved to {output_path}")
+        # rospy.loginfo(f"Map with robot's position, path, and QR codes saved to {output_path}")
 
         # Send the updated map image over ROS
         self.send_image(output_path)

@@ -51,7 +51,6 @@ class Carrying(Task):
             print(f"Lift position : {self.LiftPosition}")
             self.moveToLiftPosition = True
             
-
     def _task_finished(self, message):
         self._running = False
         super()._task_finished(message)
@@ -83,11 +82,17 @@ class Carrying(Task):
         
         # check if the robot scan a qrCode recently
         if not self.hasDetectedQrRecently: # no qrCode has been scanned
-
-            if onTop: # if not qrCode has been scanned just go straight
+            if onLeft and (not onTop) and (not onRight) : # in front of a corner going left
+                                self._turnSide = "left"
+                                self.moveToTurnPosition = True
+            elif onRight and (not onTop) and (not onLeft) : # in front of a corner going right
+                self._turnSide = "right"
+                self.moveToTurnPosition = True
+            elif onTop: # if not qrCode has been scanned just go straight
                 tm = 2
                 print("No qrCode has been scanned, going straight")
-                self._move_forward()
+                self._move_forward()        
+                self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
             else : # if the robot can't go straight, failed the task
                 self._task_failed("The robot is stuck : should go straight")
 
@@ -96,7 +101,8 @@ class Carrying(Task):
                 if self._isStationSide(self._lastQrCode): # check if the scanned qrCode is a station side
                     tm = 2
                     print("qrCode is a station side, going straight")
-                    self._move_forward()
+                    self._move_forward()        
+                    self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
                 else:
                     if self.goal_in_db(): # check if the robot has the position of the goal zone
                         print("Goal in db")
@@ -104,59 +110,74 @@ class Carrying(Task):
                         zArr = current["zone"].split(" ")
                         goal = f"{zArr[0]}_{zArr[1]}_center"
                         goalPos = self.qrcodes.get(goal, (None, None))
-                        side = self._chooSideToGo(onTop, onRight, onLeft, goalPos)
+                        side = self._chooseSideToGo(onTop, onRight, onLeft, goalPos)
                         if side == "S":
                             tm = 2
-                            self._move_forward()
+                            self._move_forward()        
+                            self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
                         elif side == "R":
-                            tm = 3
-                            self._turn_right()
+                            self._turnSide = "right"
+                            self.moveToTurnPosition = True
                         elif side == "L":
-                            tm = 3
-                            self._turn_left()
+                            self._turnSide = "left"
+                            self.moveToTurnPosition = True
                         elif side == "B":
                             tm = 6
-                            self._U_turn() 
+                            self._U_turn()         
+                            self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
                         elif side == "0":
                             return
                     else:  # the robot doesn't have the position of the goal zone, we refer to the intersection
                         intersections = self._getIntersection(current['zone']) # get the intersections of the goal zone
                         if(self._lastQrCode in [intersections[0][0], intersections[1][0]]): # the last scanned qrCode is one of the goal zone intersection
-                            if onLeft: # possibility of going left, so the robot goes left
-                                self._turn_left()
+                            if onLeft: # possibility of going left, so the robot goes left                                       
+                                self._turnSide = "left"
+                                self.moveToTurnPosition = True
                             elif onRight: # possibility of going right so the robot goes right
-                                self._turn_right()
+                                self._turnSide = "right"
+                                self.moveToTurnPosition = True
                             else: # on intersection the robot should turn, if can't, failed the task 
                                 self._task_failed("The robot is stuck : should turn") 
                         else: # the last scanned qrCode is not one of the goal zone intersection
                             # check if the robot is not in front of a corner
                             if onLeft and (not onTop) and (not onRight) : # in front of a corner going left
-                                self._turn_left() 
+                                self._turnSide = "left"
+                                self.moveToTurnPosition = True
                             elif onRight and (not onTop) and (not onLeft) : # in front of a corner going right
-                                self._turn_right()
+                                self._turnSide = "right"
+                                self.moveToTurnPosition = True
                             else: # not a corner, use shortest path
                                 print("Not a corner, using shortest path")
                                 side = self._chooseSide(onTop, onRight, onLeft, intersections)
                                 if side == "S":
                                     tm = 2
-                                    self._move_forward()
+                                    self._move_forward()        
+                                    self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
                                 elif side == "R":
-                                    tm = 3
-                                    self._turn_right()
+                                    self._turnSide = "right"
+                                    self.moveToTurnPosition = True
                                 elif side == "L":
-                                    tm = 3
-                                    self._turn_left()
+                                    self._turnSide = "left"
+                                    self.moveToTurnPosition = True
                                 elif side == "B":
                                     tm = 6
-                                    self._U_turn() 
+                                    self._U_turn()         
+                                    self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
                                 elif side == "0":
+                                    tm = 6
+                                    self._U_turn()         
+                                    self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
+                                    rospy.logerr("Wrong direction")
                                     return
-
-        self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
+        else :
+            tm = 2
+            self._move_forward()        
+            self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
+            rospy.logerr("The robot is stuck : doesn't know what to do")
 
     def _isStationSide(self, qrCode) -> bool:
         zArr = qrCode.split("_")
-        return zArr[len(zArr)-1] == "left" or zArr[len(zArr)-1] == "right"
+        return zArr[len(zArr)-1] == "left" or zArr[len(zArr)-1] == "right" or zArr[len(zArr)-1] == "up" or zArr[len(zArr)-1] == "down"
 
     def _getIntersection(self, zone : str):
         zArr = zone.split(" ")
@@ -207,6 +228,7 @@ class Carrying(Task):
                     min_distance = min_proj_distance
                     best_direction = direction
 
+        print(f"Best direction: {best_direction}")
         # Return the best direction based on the conditions
         if best_direction == "S" and onTop:
             return best_direction
@@ -220,7 +242,7 @@ class Carrying(Task):
             self._task_failed("Cannot go in the direction found by the shortest path")
             return "O"
     
-    def _chooSideToGo(self, onTop, onRight, onLeft, target_position):
+    def _chooseSideToGo(self, onTop, onRight, onLeft, target_position):
         directions = {"S": 0, "L": math.pi / 2, "R": -math.pi / 2, "B": math.pi}
         best_direction = None
         min_distance = float('inf')
@@ -251,6 +273,7 @@ class Carrying(Task):
                 min_distance = distance
                 best_direction = direction
 
+        print(f"Best direction: {best_direction}")
         # Choose the best valid direction
         if best_direction == "S" and onTop:
             return best_direction
