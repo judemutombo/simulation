@@ -77,7 +77,7 @@ class ProcessController :
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
         
-        self._publishProcessState()
+        
 
     def _task_failed(self, message, **kwargs):
         rospy.logerr(f"Message from task : {message}")
@@ -109,12 +109,15 @@ class ProcessController :
             response = mo(key_value_array)
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
+        finally:
+            self._publishProcessState()
 
     def _carrying_finished(self, messages, **kwargs):
         self._proccessing = False
         self._currentTask.stop()
         self._currentTask = None
         rospy.loginfo("Carrying process finished")
+        self._publishProcessState()
 
     def _publishProcessState(self):
         state = "Processing" if self._currentTask is not None else "Stationary"
