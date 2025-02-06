@@ -18,7 +18,21 @@ class Mapping(Task):
         else:
             super().start()
 
+    def junction_decision(self, onLeft, onRight, onTop):
+        tm = 3
+        if onTop:
+            print("On top")
+            tm = 1
+            self._move_forward()
+            self.timer = rospy.Timer(rospy.Duration(tm), self.resume_processing, oneshot=True)
+        elif onLeft:
+            self._turnSide = "left"
+            self.moveToTurnPosition = True
+        elif onRight:
+            self._turnSide = "right"
+            self.moveToTurnPosition = True
 
+    
     def _check_qr(self, decoded_text):
         if not self._processQrCode :
             self._processQrCode = True

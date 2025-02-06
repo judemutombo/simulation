@@ -3,7 +3,7 @@
 import rospy
 import tf2_ros
 import tf2_geometry_msgs
-from nav_msgs.msg import OccupancyGrid
+from sensor_msgs.msg import LaserScan
 import cv2
 import numpy as np
 import base64
@@ -21,15 +21,23 @@ class MapProcess:
         # Initialize variables
         self.robot_position = None
         self.robot_rotation = None
-        self.latest_map = None
+        self.latest_scan = None
         self.bridge = CvBridge()
         self.path_history = []  # To store the robot's path
         self.qr_code_positions = []  # To store QR code positions
         self.qr_code_size = 3  # Size of the QR code squares (adjustable)
 
+        # Map parameters
+        self.map_resolution = 0.05  # 5 cm per pixel
+        self.map_width = 400  # Width of the map in pixels
+        self.map_height = 400  # Height of the map in pixels
+        self.map_origin_x = -10.0  # X coordinate of the map origin (in meters)
+        self.map_origin_y = -10.0  # Y coordinate of the map origin (in meters)
+        self.map_image = np.ones((self.map_height, self.map_width), dtype=np.uint8) * 255  # Initialize map as free space (white)
+
         # Publishers and Subscribers
         self.pub_map = rospy.Publisher("map_feed", Image, queue_size=10)
-        rospy.Subscriber("/map", OccupancyGrid, self.map_callback)
+        rospy.Subscriber("/scan", LaserScan, self.scan_callback)  # Subscribe to /scan
 
         # TF2 listener
         self.tf_buffer = tf2_ros.Buffer()
@@ -57,23 +65,23 @@ class MapProcess:
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn("Could not get transform: %s", str(e))
 
-    def map_callback(self, data):
+    def scan_callback(self, data):
         """
-        Callback for the /map topic. Stores the latest map data.
+        Callback for the /scan topic. Stores the latest laser scan data.
         """
-        self.latest_map = data
-        rospy.loginfo_once("Map data received.")
+        self.latest_scan = data
+        rospy.loginfo_once("Laser scan data received.")
 
     def timer_callback(self, event):
         """
-        Timer callback for fixed-rate processing of the map and robot position.
+        Timer callback for fixed-rate processing of the robot position and laser scan.
         """
         # Get the latest robot position and orientation
         self.tf_listener()
 
-        # Process the map if it's available
-        if self.latest_map is not None and self.robot_position is not None and self.robot_rotation is not None:
-            self.process_map(self.latest_map)
+        # Process the laser scan if it's available
+        if self.latest_scan is not None and self.robot_position is not None and self.robot_rotation is not None:
+            self.process_scan()
 
     def read_qr_codes(self, event):
         """
@@ -96,82 +104,95 @@ class MapProcess:
         except sqlite3.Error as e:
             rospy.logerr(f"Error reading QR code positions from database: {e}")
 
-    def process_map(self, map_data):
+    def process_scan(self):
         """
-        Process the map data and overlay the robot's position, orientation, path, and QR codes.
+        Process the laser scan data and update the local map.
         """
-        # Convert the OccupancyGrid data to a NumPy array
-        width = map_data.info.width
-        height = map_data.info.height
-        map_array = np.array(map_data.data, dtype=np.int8).reshape((height, width))
+        # Reset map to empty space but do NOT clear previous obstacles
+        self.map_image.fill(255)  # Set all pixels to white (free space)
 
-        # Normalize the map values to [0, 255] for OpenCV visualization
-        map_image = np.zeros_like(map_array, dtype=np.uint8)
-        map_image[map_array == 100] = 0    # Occupied cells (black)
-        map_image[map_array == 0] = 255    # Free cells (white)
-        map_image[map_array == -1] = 127   # Unknown cells (gray)
+        # Convert robot's position to pixel coordinates
+        robot_x_pixel = int((self.robot_position.x - self.map_origin_x) / self.map_resolution)
+        robot_y_pixel = int((self.robot_position.y - self.map_origin_y) / self.map_resolution)
 
-        # Convert the grayscale map image to a 3-channel color image
-        map_image_color = cv2.cvtColor(map_image, cv2.COLOR_GRAY2BGR)
-
-        # Convert robot's position from map frame to pixel coordinates
-        robot_x_pixel = int((self.robot_position.x - map_data.info.origin.position.x) / map_data.info.resolution)
-        robot_y_pixel = int((self.robot_position.y - map_data.info.origin.position.y) / map_data.info.resolution)
-
-        # Ensure the robot's position is within the map bounds
-        if not (0 <= robot_x_pixel < width and 0 <= robot_y_pixel < height):
-            rospy.logwarn(f"Robot position ({robot_x_pixel}, {robot_y_pixel}) is outside the map bounds.")
+        if not (0 <= robot_x_pixel < self.map_width and 0 <= robot_y_pixel < self.map_height):
+            rospy.logwarn(f"Robot position ({robot_x_pixel}, {robot_y_pixel}) is out of bounds.")
             return
 
-        # Store the robot's current position in the path history
-        self.path_history.append((robot_x_pixel, robot_y_pixel))
+        # Update map with the latest scan (draw obstacles)
+        self.update_map_from_scan()
 
-        # Draw the robot's path as a green line
+        # Convert to a color image for visualization
+        map_image_color = cv2.cvtColor(self.map_image, cv2.COLOR_GRAY2BGR)
+
+        # Draw the robot's path in green
         if len(self.path_history) > 1:
             for i in range(1, len(self.path_history)):
-                cv2.line(map_image_color, self.path_history[i - 1], self.path_history[i], (0, 255, 0), 2)  # Green line
+                cv2.line(map_image_color, self.path_history[i - 1], self.path_history[i], (0, 255, 0), 2)
 
-        # Draw QR code positions as blue squares
+        # Draw QR code positions in blue
         for qr_x, qr_y in self.qr_code_positions:
-            qr_x_pixel = int((qr_x - map_data.info.origin.position.x) / map_data.info.resolution)
-            qr_y_pixel = int((qr_y - map_data.info.origin.position.y) / map_data.info.resolution)
-
-            # Ensure the QR code position is within the map bounds
-            if 0 <= qr_x_pixel < width and 0 <= qr_y_pixel < height:
-                # Draw a smaller blue square
+            qr_x_pixel = int((qr_x - self.map_origin_x) / self.map_resolution)
+            qr_y_pixel = int((qr_y - self.map_origin_y) / self.map_resolution)
+            if 0 <= qr_x_pixel < self.map_width and 0 <= qr_y_pixel < self.map_height:
                 cv2.rectangle(
                     map_image_color,
-                    (qr_x_pixel - self.qr_code_size, qr_y_pixel - self.qr_code_size),  # Top-left corner
-                    (qr_x_pixel + self.qr_code_size, qr_y_pixel + self.qr_code_size),  # Bottom-right corner
-                    (255, 0, 0),  # Blue color
-                    -1  # Fill the square
+                    (qr_x_pixel - self.qr_code_size, qr_y_pixel - self.qr_code_size),
+                    (qr_x_pixel + self.qr_code_size, qr_y_pixel + self.qr_code_size),
+                    (255, 0, 0),  # Blue
+                    -1
                 )
 
-        # Draw a red circle at the robot's current position
-        map_image_color = cv2.circle(map_image_color, (robot_x_pixel, robot_y_pixel), 5, (0, 0, 255), -1)  # Red circle
+        # Draw robot position in red
+        cv2.circle(map_image_color, (robot_x_pixel, robot_y_pixel), 5, (0, 0, 255), -1)
 
-        # Optionally, draw the robot's orientation (line indicating yaw)
-        yaw = self.get_yaw_from_quaternion(self.robot_rotation)  # Use yaw from the transform
-        robot_x_end = robot_x_pixel + int(np.cos(yaw) * 10)  # Line length 10
+        # Draw robot orientation (Yaw Direction)
+        yaw = self.get_yaw_from_quaternion(self.robot_rotation)
+        robot_x_end = robot_x_pixel + int(np.cos(yaw) * 10)
         robot_y_end = robot_y_pixel + int(np.sin(yaw) * 10)
+        cv2.line(map_image_color, (robot_x_pixel, robot_y_pixel), (robot_x_end, robot_y_end), (0, 255, 0), 2)
 
-        # Draw the yaw direction as a line
-        map_image_color = cv2.line(map_image_color, (robot_x_pixel, robot_y_pixel), (robot_x_end, robot_y_end), (0, 255, 0), 2)  # Green line
-
-        # Flip the image vertically (Y-axis flip)
-        map_image_color = np.flipud(map_image_color)  # Flip the image along the Y-axis
-
-        # Rotate the image by -90 degrees (counterclockwise)
+        # Flip and rotate image for correct orientation
+        map_image_color = np.flipud(map_image_color)
         map_image_color = cv2.rotate(map_image_color, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-        # Save the updated map with robot's position, orientation, path, and QR codes
+        # Save and publish map
         output_path = "/tmp/robot_map_with_position.png"
         cv2.imwrite(output_path, map_image_color)
-        # rospy.loginfo(f"Map with robot's position, path, and QR codes saved to {output_path}")
-
-        # Send the updated map image over ROS
         self.send_image(output_path)
 
+
+    def update_map_from_scan(self):
+        """
+        Update the local map based on the latest laser scan data.
+        """
+        if self.robot_position is None or self.robot_rotation is None:
+            return
+
+        # Get the robot's yaw (orientation)
+        yaw = self.get_yaw_from_quaternion(self.robot_rotation)
+
+        # Iterate through the laser scan ranges
+        for i, range_val in enumerate(self.latest_scan.ranges):
+            if range_val < self.latest_scan.range_min or range_val > self.latest_scan.range_max:
+                continue  # Skip invalid range values
+
+            # Calculate the angle of the current laser beam
+            angle = self.latest_scan.angle_min + i * self.latest_scan.angle_increment
+
+            # Calculate the position of the laser beam endpoint in the map frame
+            endpoint_x = self.robot_position.x + range_val * np.cos(yaw + angle)
+            endpoint_y = self.robot_position.y + range_val * np.sin(yaw + angle)
+
+            # Convert the endpoint position to pixel coordinates
+            endpoint_x_pixel = int((endpoint_x - self.map_origin_x) / self.map_resolution)
+            endpoint_y_pixel = int((endpoint_y - self.map_origin_y) / self.map_resolution)
+            # Ensure the endpoint is within the map bounds
+            if 0 <= endpoint_x_pixel < self.map_width and 0 <= endpoint_y_pixel < self.map_height:
+                # Mark the endpoint as occupied (black)
+                self.map_image[endpoint_y_pixel, endpoint_x_pixel] = 0
+
+                
     def send_image(self, image_path):
         """
         Send the processed map image over ROS.

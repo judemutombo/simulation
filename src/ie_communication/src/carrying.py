@@ -372,9 +372,3 @@ class Carrying(Task):
         self.qrcodes.get(goal) is not None
         return goal in self.qrcodes
 
-if __name__ == '__main__':
-
-    rospy.init_node('mapping')
-    cr = Carrying()
-    cr.start()
-    rospy.spin()

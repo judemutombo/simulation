@@ -13,6 +13,7 @@ import math
 import signalslot
 import asyncio
 from sensor_msgs.msg import LaserScan
+from tf.transformations import euler_from_quaternion
 
 class Task:
 
@@ -50,8 +51,16 @@ class Task:
         self._processQrCode =  False
         self._making_u_turn = False
         self._making_turn = False
+
+
         self._obstacleInFront = False
         self._obstacleChecker = 0
+        self._contourningObstacle = False
+        self._contourningStep = 0
+        self._contourningTimer = None
+        self._wasContourning = False
+        self.safe_distance = 0.6
+
         self._timeToTurn = False
         self.moveToTurnPosition = False
         self._turnSide = None
@@ -59,8 +68,7 @@ class Task:
         rospy.Subscriber("/camera_right/camera_right/image_raw", Image, self.right_callback, queue_size=10)
         rospy.Subscriber("/camera_qr_code_feed",Image, self._camqrProcess)
         rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
-
-    
+  
     def running(self):
         return self._running
     
@@ -305,6 +313,13 @@ class Task:
         self.moveToTurnPosition = False
         self._turnSide = None
         self._timeToTurn = False
+        if self._wasContourning:
+            self._wasContourning = False
+            self._obstacleInFront = False
+            self._obstacleChecker = 0
+            self._contourningObstacle = False
+            self._contourningStep = 1
+
         if self.timer:
             self.timer.shutdown()  # Clean up the timer
 
@@ -431,18 +446,18 @@ class Task:
     def _task_failed(self, message):
         self._finish_task(success=False, message=message) 
     
-    def map_callback(self, data):
+    def scan_callback(self, data):
         """
         Callback function for the /scan topic. Updates the scan data.
         """
-        self.scan_data = None = data  # Store the latest scan data
+        self.scan_data = data  # Store the latest scan data
 
     def check_for_obstacles(self, event):
         """
         Function to check for obstacles in front of the robot using LIDAR data.
         This function should be called periodically (e.g., in the main loop).
         """
-        if self.scan_data is None:
+        if self.scan_data is None or len(self.scan_data.ranges) == 0:
             return  # No LIDAR data available yet
 
         print("Checking for obstacles using LIDAR data")
@@ -456,17 +471,18 @@ class Task:
         num_ranges = len(self.scan_data.ranges)
 
         # Calculate the indices corresponding to the front angle range
-        start_index = int((-front_angle_range_rad / 2 - self.scan_data.angle_min) / angle_increment)
-        end_index = int((front_angle_range_rad / 2 - self.scan_data.angle_min) / angle_increment)
+        min_angle = self.scan_data.angle_min
+        start_index = max(0, int((min_angle - front_angle_range_rad / 2) / angle_increment))
+        end_index = min(num_ranges - 1, int((min_angle + front_angle_range_rad / 2) / angle_increment))
 
         # Check for obstacles in the front angle range
         min_distance = float('inf')
         for i in range(start_index, end_index):
-            if 0 < self.scan_data.ranges[i] < min_distance:
+            if 0 < self.scan_data.ranges[i] < min_distance and np.isfinite(self.scan_data.ranges[i]):
                 min_distance = self.scan_data.ranges[i]
 
         # Define the obstacle distance threshold (in meters)
-        obstacle_distance_threshold = 0.5  # Adjust this value as needed
+        obstacle_distance_threshold = 0.3  # Adjust this value as needed
 
         # Check if an obstacle is detected
         if min_distance < obstacle_distance_threshold:
@@ -474,33 +490,143 @@ class Task:
             rospy.loginfo(f"Obstacle detected at {min_distance:.2f} meters!")
             self.stop()  # Stop the robot
 
-            # check for 5 times while checking if the obstacle is still there
-            if self._obstacleChecker < 5:
-                if min_distance >= obstacle_distance_threshold:  # Obstacle has moved
-                    rospy.loginfo("Obstacle has been moved. Resuming movement.")
-                    self._obstacleInFront = False
-                    self._obstacleChecker = 0
-                    return
-                else:
-                    self._obstacleChecker += 1
-            else:
-                # If the obstacle is still there after 5 seconds, call the contour_obstacle function
+            # Increment obstacle checker counter
+            self._obstacleChecker += 1
+
+            if self._obstacleChecker >= 5:
+                # If the obstacle is still there after 5 checks, call contour_obstacle function
                 rospy.loginfo("Obstacle is still present. Calling contour_obstacle function.")
                 self._obstacleChecker = 0
-                self.contour_obstacle()
+
+                if not self._contourningObstacle:
+                    self._contourningObstacle = True
+                    self.contour_obstacle()
         else:
             self._obstacleInFront = False
-            rospy.loginfo("No obstacle detected. Moving forward.")
+            self._obstacleChecker = 0  # Reset the counter when no obstacle is found
+            rospy.loginfo("No obstacle detected. Moving.")
 
     def contour_obstacle(self):
         """
-        Function to handle obstacle contouring. This is a stub and should be implemented
-        with the logic to navigate around the obstacle.
+        Function to handle obstacle contouring with odometry-based 90-degree turns.
         """
-        rospy.loginfo("Contouring obstacle...")
-        # Add your logic here to navigate around the obstacle
-        pass
+        self._contourningStep += 1 # Increment the contouring step
+        if self.timer:
+            self.timer.shutdown()  # Clean up the timer
+        self.stop()  # Stop the robot
+        
+        if self._contourningStep == 1:
+            rospy.loginfo("Contouring obstacle: Step 1")
+            self.turn_angle(90)  # Turn left 90°
+            self.contour_obstacle()
+        elif self._contourningStep == 2:
+            rospy.loginfo("Contouring obstacle: Step 2")
+            self._move_forward()  # Move forward until obstacle is behind
+            while not self.is_obstacle_behind():
+                rospy.sleep(0.1)
+            self.turn_angle(-90)  # Turn right 90°
+            self.contour_obstacle()
+        elif self._contourningStep == 3:
+            rospy.loginfo("Contouring obstacle: Step 3")
+            self._move_forward()  # Move forward to bypass the obstacle
+            while not self.is_obstacle_behind():
+                rospy.sleep(0.1)
+            self.turn_angle(-90)  # Turn right 90° to face back towards original line
+            self.contour_obstacle()
+        elif self._contourningStep == 4:
+            rospy.loginfo("Contouring obstacle: Step 4")
+            self._move_forward()  # Move forward to return to path (you already implemented this)
+            self._turnSide = "left"
+            self.moveToTurnPosition = True
+            self._obstacleInFront = False
 
+    def turn_angle(self, target_angle):
+        """
+        Turns the robot by a specified angle using odometry.
+        target_angle: Positive for left, negative for right.
+        """
+        rospy.loginfo(f"Turning {target_angle}°")
+        
+        # Get the starting yaw angle from odometry
+        start_yaw = self._get_yaw()
+
+        # Compute target yaw
+        target_yaw = start_yaw + np.deg2rad(target_angle)
+        
+        # Normalize angle to be within -π to π
+        target_yaw = np.arctan2(np.sin(target_yaw), np.cos(target_yaw))
+
+        # Set turning speed
+        turn_speed = 0.3 if target_angle > 0 else -0.3  # Left turn (positive), Right turn (negative)
+
+        # Turn until the robot reaches the target angle
+        while not rospy.is_shutdown():
+            current_yaw = self._get_yaw()
+            angle_diff = np.arctan2(np.sin(target_yaw - current_yaw), np.cos(target_yaw - current_yaw))
+
+            if abs(angle_diff) < np.deg2rad(2):  # Stop when close to target angle (within 2°)
+                break
+
+            # Publish turning command
+            self.publish_velocity(angular=turn_speed)
+            rospy.sleep(0.1)
+
+        # Stop the turn
+        self.publish_velocity(angular=0)
+        rospy.loginfo(f"Turn completed: {target_angle}°")
+
+    def publish_velocity(self, linear=0, angular=0):
+        """
+        Publishes velocity commands to move the robot.
+        """
+        
+        self.msg.linear.x = 0
+        self.msg.angular.z = angular
+        self.pub2.publish(self.msg)
+
+    def _get_yaw(self):
+        """
+        Extracts the yaw (rotation around the Z-axis) from odometry data.
+        """
+        orientation_q = self.robot_pose.orientation
+        quaternion = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
+        _, _, yaw = euler_from_quaternion(quaternion)
+        return yaw
+
+    def is_obstacle_behind(self):
+        """
+        Check if the obstacle is behind the robot by focusing on the right-bottom sector.
+        """
+        if self.scan_data is None:
+            return False  # No LIDAR data available
+
+        # Robot parameters
+        robot_length = 0.52  # Length of the robot in meters
+        obstacle_distance_threshold = robot_length  # Obstacle must be at least this far behind
+
+        # Define the right-bottom sector to check (in radians)
+        # Right-bottom sector: 45 to 90 degrees (relative to the robot's rear)
+        sector_start_angle = np.deg2rad(225)  # 225 degrees
+        sector_end_angle = np.deg2rad(270)   # 270 degrees
+
+        # Get the angle increment and number of ranges
+        angle_increment = self.scan_data.angle_increment
+        num_ranges = len(self.scan_data.ranges)
+
+        # Calculate the indices corresponding to the right-bottom sector
+        start_index = int((sector_start_angle - self.scan_data.angle_min) / angle_increment)
+        end_index = int((sector_end_angle - self.scan_data.angle_min) / angle_increment)
+
+        # Check for obstacles in the right-bottom sector
+        min_distance = float('inf')
+        for i in range(start_index, end_index):
+            if 0 < self.scan_data.ranges[i] < min_distance:
+                min_distance = self.scan_data.ranges[i]
+
+        print(f"min distance : {min_distance}")
+        # Return True if an obstacle is detected within the threshold
+        return min_distance > obstacle_distance_threshold and min_distance < (obstacle_distance_threshold + 0.5)
+      
     async def _execute(self):
         """
         Main execution loop for the task. This function is called when the task starts.
@@ -594,7 +720,6 @@ class Task:
             return
         self.processSideImage(data)
            
-
     def shouldTurn(self, mask):
         height, width = mask.shape
         middle_start = (width // 2) - (self._middle_width // 2)
@@ -631,10 +756,31 @@ class Task:
         
         self.timer = rospy.Timer(rospy.Duration(2), self.resume_processing, oneshot=True)
 
-if __name__ == '__main__':
+    def get_min_distance(self, angle_start, angle_end):
+        """
+        Get the minimum distance within a given LIDAR angle range.
+        angle_start and angle_end are in degrees.
+        """
+        if self.scan_data is None:
+            return float('inf')
 
-    rospy.init_node('Threshold')
-    th = Task(task="mapping")
-    th.start()
-    rospy.spin()
-    
+        # Convert degrees to radians
+        angle_start_rad = np.deg2rad(angle_start)
+        angle_end_rad = np.deg2rad(angle_end)
+
+        # Get LIDAR parameters
+        angle_increment = self.scan_data.angle_increment
+        num_ranges = len(self.scan_data.ranges)
+
+        # Calculate index range
+        start_index = max(0, int((angle_start_rad - self.scan_data.angle_min) / angle_increment))
+        end_index = min(num_ranges - 1, int((angle_end_rad - self.scan_data.angle_min) / angle_increment))
+
+        # Find minimum distance within the range
+        min_distance = float('inf')
+        for i in range(start_index, end_index):
+            if 0 < self.scan_data.ranges[i] < min_distance and np.isfinite(self.scan_data.ranges[i]):
+                min_distance = self.scan_data.ranges[i]
+
+        return min_distance
+
